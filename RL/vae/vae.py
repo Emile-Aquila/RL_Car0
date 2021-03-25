@@ -16,23 +16,16 @@ to_image = transforms.ToPILImage()
 
 
 def load_pictures():
-    # dataset = datasets(root='/home/emile/Documents/Code/RL_car/train_data', transform=Picture())
-    # dataset = datasets.ImageFolder(root='/home/emile/Documents/Code/RL_car/train_data', transform=transforms.Compose([
-    #     transforms.ToTensor(),
-    # ]))
-    pic_dir = "/home/emile/Documents/Code/RL_car/train_data/pictures"
-    file_name = "_cam-image_array_.jpg"
-    num_file = sum(os.path.isfile(os.path.join(pic_dir, name)) for name in os.listdir(pic_dir))
-    ans = []
-    for index in tqdm(range(num_file)):
-        path = pic_dir + "/" + str(index) + file_name
-        img = np.array(Image.open(path).resize((160, 120)).crop((0, 40, 160, 120)))
-        im = torch.from_numpy(img.reshape((1, 80, 160, 3))).to(dev).permute(0, 3, 1, 2).float().to(dev)
-        ans.append(im/255.0)
-    # ans = torch.utils.data.DataLoader(ans, batch_size=64, shuffle=True, num_workers=2, pin_memory=True)
-    # dataloader = torch.utils.data.DataLoader(dataset, batch_size=64, shuffle=True, num_workers=2, pin_memory=True)
-    random.shuffle(ans)
-    return ans
+    bs = 64
+    dataset = datasets.ImageFolder(root='./RL/vae/dataset_img/crop_data/crop_64_dataset/', transform=transforms.Compose([
+    #dataset = datasets.ImageFolder(root='./RL/vae/dataset_img/crop_data/dataset/', transform=transforms.Compose([
+        transforms.ToTensor(),
+    ]))
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=bs, shuffle=True)
+    print(len(dataset.imgs)) 
+    print(len(dataloader))
+    return dataloader
+
 
 
 def reparameterize(means, logvar):
@@ -48,23 +41,27 @@ class Flatten(nn.Module):
 
 
 class UnFlatten(nn.Module):
-    def forward(self, inputs, size=256):
-        ans = inputs.view(inputs.size(0), size, 3, 8)
+    def forward(self, inputs, size=512):#256
+        #ans = inputs.view(inputs.size(0), size, 3, 8)
+        ans = inputs.view(inputs.size(0), size, 2, 5)
+        
         return ans
 
 
 class VAE(nn.Module):
-    def __init__(self, image_channels=3, h_dim=6144, z_dim=32):
+    def __init__(self, image_channels=3, h_dim=5120, z_dim=64):#6144#4096
         super(VAE, self).__init__()
         self.z_dim = z_dim
         self.encoder = nn.Sequential(
-            nn.Conv2d(image_channels, 32, kernel_size=4, stride=2),
+            nn.Conv2d(image_channels, 32, kernel_size=3, stride=2,padding=1),
             nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=4, stride=2),
+            nn.Conv2d(32, 64,  kernel_size=3, stride=2,padding=1),
             nn.ReLU(),
-            nn.Conv2d(64, 128, kernel_size=4, stride=2),
+            nn.Conv2d(64, 128, kernel_size=3, stride=2,padding=1),
             nn.ReLU(),
-            nn.Conv2d(128, 256, kernel_size=4, stride=2),
+            nn.Conv2d(128, 256,  kernel_size=3, stride=2,padding=1),
+            nn.ReLU(),
+            nn.Conv2d(256, 512,  kernel_size=3, stride=2,padding=1),
             nn.ReLU(),
             Flatten()
         ).to(dev)
@@ -75,13 +72,15 @@ class VAE(nn.Module):
 
         self.decoder = nn.Sequential(
             UnFlatten(),
-            nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2),
+            nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2),
             nn.ReLU(),
-            nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2),
+            nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2),
             nn.ReLU(),
-            nn.ConvTranspose2d(64, 32, kernel_size=5, stride=2),
+            nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2),
             nn.ReLU(),
-            nn.ConvTranspose2d(32, image_channels, kernel_size=4, stride=2),
+            nn.ConvTranspose2d(64, 32, kernel_size=2, stride=2),
+            nn.ReLU(),
+            nn.ConvTranspose2d(32, image_channels, kernel_size=2, stride=2),
             nn.Sigmoid(),
         ).to(dev)
 
@@ -111,72 +110,79 @@ class VAE(nn.Module):
         r_image = self.decode(z)
         return r_image, mu, logvar, z
 
-    def loss_fn(self, images, r_image, mean, logvar):
-        KL = -0.5 * torch.sum((1 + logvar - mean.pow(2) - logvar.exp()), dim=0)
-        KL = torch.mean(KL)
-        r_image = r_image.contiguous().view(-1, 38400)
-        images = images.contiguous().view(-1, 38400)
-        r_image_loss = F.binary_cross_entropy(r_image, images, reduction='mean')  # size_average=False)
-        # print("loss reconst {}".format(r_image_loss.clone().cpu().detach().numpy()))
-        # print("loss KL {}".format(KL.clone().cpu().detach().numpy()))
-        loss = r_image_loss + 5.0 * KL
-        # print("loss {}".format(loss.clone().cpu().detach().numpy()))
-        return loss
+    def loss_fn(self, images, r_image, mean, logvar ,real=False):
+        #KL = -0.5 * torch.sum((1 + logvar - mean.pow(2) - logvar.exp()), dim=0)
+        KL = -0.5 * torch.sum(1 + logvar - mean**2 - torch.exp(logvar))
+        if real :
+            KL = torch.mean(KL)
+        #print(images.size())
+        #print(r_image.size())
+        r_image = r_image.contiguous().view(-1, 30720)#38400
+        images = images.contiguous().view(-1, 30720)#38400
+        #print(images.size())
+        r_image_loss = F.binary_cross_entropy(r_image, images, reduction='sum') 
+        loss = r_image_loss+ 5.0 * KL 
+        return loss,KL,r_image_loss
 
-    def evaluate(self, image):
-        plt.ion()
+    def evaluate(self, image,epoch,output_dir):
+        #plt.ion()
         r_image, mean, log_var, z = self.forward(image)
-        pre_im = to_image(image.clone().detach().cpu().squeeze(0))
-        im_now = to_image(r_image.clone().detach().cpu().squeeze(0))
-        z = to_image(z.clone().detach().cpu())
+        pre_im = to_image(image[0].clone().detach().cpu().squeeze(0))
+        im_now = to_image(r_image[0].clone().detach().cpu().squeeze(0))
+        #z = to_image(z[0].clone().detach().cpu())
         plt.imshow(pre_im)
-        plt.pause(0.1)
+        plt.show()
+        #plt.imsave(f'{output_dir}/original_{epoch}.png',pre_im)
+        #plt.pause(0.1)
         plt.imshow(im_now)
-        plt.pause(0.1)
-        plt.imshow(z)
-        plt.pause(0.1)
-        plt.figure()
+        #plt.imsave(f'{output_dir}/Generate_{epoch}.png',im_now)
+        #plt.pause(0.1)
+        #plt.imshow(z)
+        #plt.pause(0.1)
+        #plt.figure()
+        plt.show()
 
 
-def train_vae(vae, epochs, train_datas):
+def train_vae(vae, epochs, train_datas,output_dir,real):
     optimizer = torch.optim.Adam(vae.parameters(), lr=1e-3)
     vae.train()
     flag = False
     for epoch in range(epochs):
         losses = []
         tmp = 0
-        for data in tqdm(train_datas):
-            tmp += 1
-            images = data.to(dev)
-            # if not flag:
-            #     vae.evaluate(images)
-            #     flag = True
-            r_images, means, log_var, zs = vae(images)
-            if tmp == 1:
-                loss = vae.loss_fn(images, r_images, means, log_var).to(dev)
-            else:
-                loss += vae.loss_fn(images, r_images, means, log_var).to(dev)
-            if (tmp//6) == 0:
-                loss = loss.mean()
-                loss.backward()
-                optimizer.step()
-                optimizer.zero_grad()
-                tmp = 0
-                losses.append(loss.clone().cpu().detach().numpy())
-        print("epoch{}: average loss {}".format(epoch, np.array(losses).mean()))
-        vae.evaluate(random.choice(train_datas))
-        torch.save(vae.cpu().state_dict(), './vae.pth')
+        for idx, (images, _) in enumerate(train_datas):
+            images = images.to(dev)
+            optimizer.zero_grad()
+            #recon_images, mu, logvar = vae(images)
+            recon_images, mu, logvar, z = vae(images)
+            
+            loss,kl,re = vae.loss_fn(images, recon_images, mu, logvar,real)
+            loss.backward()
+            optimizer.step()
+            losses.append(loss.cpu().detach().numpy())
+            
+        print("EPOCH: {} loss: {}".format(epoch+1, np.average(losses)))
+        print(f'kl:{kl} re:{re}')
+
+        
+        if epoch%10==0:
+            vae.evaluate(images,epoch,output_dir)
+        torch.save(vae.cpu().state_dict(), f'{output_dir}/vae.pth')
         vae.to(dev)
         flag = False
+        
+    vae.evaluate(images,epoch,output_dir)
 
 
 
 
 
 def main():
+    output_dir='./output/test'
+    real=False
     vae = VAE()
     pics = load_pictures()
-    train_vae(vae, 50, pics)
+    train_vae(vae, 50, pics,output_dir,real)
 
 
 if __name__ == "__main__":
