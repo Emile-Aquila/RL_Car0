@@ -30,7 +30,7 @@ class MyEnv:
         self._gen_id = 0  # 何回目のgenerateかを保持
         self._frames = []  # mp4生成用にframeを保存
         # pre processing
-        self._state_frames = deque(maxlen=self._state_frames)  # 変換前のframe
+        self._state_frames = deque(maxlen=self._state_frame_len)  # 変換前のframe
         self._gen_id = 0  # 何回目のgenerateかを保持
         self._frames = []  # mp4生成用にframeを保存
         # self.num_envs = 1
@@ -55,10 +55,10 @@ class MyEnv:
 
     def _reward_func(self, done, info):  # rewとdoneを変更する
         omega, omega1 = 10.0, 5.0
-        if (abs(info["cte"]) >= 1.0) or done:
-            return True, -1.0 - info["speed"] / 10.0 / omega
+        if (abs(info["cte"]) >= 1.5) or done:
+            return -1.0 - info["speed"] / 10.0 / omega, True
         else:
-            return False, 0.1 + info["speed"] / 100.0 / omega1
+            return 0.1 + info["speed"] / 100.0 / omega1, False
 
     def reset(self):
         rand_step = random.randrange(10)
