@@ -16,105 +16,6 @@ def init_weights(m):
         nn.init.kaiming_normal_(m.weight)
 
 
-class CriticNetwork2(nn.Module):
-    def __init__(self):
-        super().__init__()
-        num = 64
-        self.net1 = nn.Sequential(
-            nn.Conv2d(3, num, 4, stride=2),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(num, 64, 4, stride=2),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 32, 4, stride=2),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(32, 8, 4, stride=2),
-            nn.ReLU(inplace=True),
-            Flatten(),  # torch.Size([1, 192])
-            nn.Linear(192, 64),  # torch.Size([1, 64])
-            # nn.Linear(64, 2 * 2),
-        )
-        self.net1_2 = nn.Sequential(
-            nn.Conv2d(3, num, 4, stride=2),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(num, 64, 4, stride=2),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 32, 4, stride=2),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(32, 8, 4, stride=2),
-            nn.ReLU(inplace=True),
-            Flatten(),  # torch.Size([1, 192])
-            nn.Linear(192, 64),  # torch.Size([1, 64])
-            # nn.Linear(64, 2 * 2),
-        )
-        self.net2 = nn.Sequential(
-            nn.Linear(2, 64)
-        )
-        self.net2_2 = nn.Sequential(
-            nn.Linear(2, 64)
-        )
-        self.net3 = nn.Sequential(
-            nn.Linear(64 * 2, 64),
-            nn.ReLU(inplace=True),
-            nn.Linear(64, 1),
-        )
-        self.net3_2 = nn.Sequential(
-            nn.Linear(64 * 2, 64),
-            nn.ReLU(inplace=True),
-            nn.Linear(64, 1),
-        )
-        self.net1.apply(init_weights)
-        self.net1_2.apply(init_weights)
-        self.net2.apply(init_weights)
-        self.net2_2.apply(init_weights)
-        self.net3.apply(init_weights)
-        self.net3_2.apply(init_weights)
-
-    def forward(self, states, acts):
-        s1, s2 = self.net1(states), self.net1_2(states)
-        a1, a2 = self.net2(acts), self.net2_2(acts)
-        t1 = torch.cat((s1, a1), dim=-1)
-        t2 = torch.cat((s2, a2), dim=-1)
-        out1, out2 = self.net3(t1), self.net3_2(t2)
-        return out1, out2
-
-
-class ActorNetwork2(nn.Module):
-    def __init__(self):
-        super().__init__()
-        num = 64
-        self.net = nn.Sequential(
-            nn.Conv2d(3, num, 4, stride=2),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(num, 64, 4, stride=2),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(64, 32, 4, stride=2),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(32, 8, 4, stride=2),
-            nn.ReLU(inplace=True),
-            Flatten(),  # torch.Size([1, 192])
-            nn.Linear(192, 64),  # torch.Size([1, 64])
-            nn.ReLU(inplace=True),
-            nn.Linear(64, 2 * 2),
-        )
-        self.net.apply(init_weights)
-
-    def forward(self, states):
-        # print(states.shape)
-        # print("net {}".format(self.net(states).shape))
-        means, log_stds = self.net(states).chunk(2, dim=-1)
-        # print("m,l {}, {}".format(means.shape, log_stds.shape))
-        return means, log_stds
-
-    def sample(self, inputs, deterministic=False):
-        #  select action from inputs
-        means, log_stds = self.forward(inputs)
-        if deterministic:
-            return torch.tanh(means)
-        else:
-            log_stds = torch.clip(log_stds, -20.0, 2.0)
-            return reparameterize(means, log_stds)
-
-
 class ActorNetwork(nn.Module):
     def __init__(self, state_shape, action_shape):
         super().__init__()
@@ -123,14 +24,14 @@ class ActorNetwork(nn.Module):
             # nn.Linear(state_shape[0], num),
             nn.Linear(state_shape, num),
             nn.ReLU(inplace=True),
-            nn.Linear(num, num),
-            nn.ReLU(inplace=True),
-            nn.Linear(num, num),
-            nn.ReLU(inplace=True),
             nn.Linear(num, 128),
             nn.ReLU(inplace=True),
             nn.Linear(128, 64),
             nn.ReLU(inplace=True),
+            # nn.Linear(num, 128),
+            # nn.ReLU(inplace=True),
+            # nn.Linear(128, 64),
+            # nn.ReLU(inplace=True),
             nn.Linear(64, 2 * action_shape[0]),
         )
         self.net.apply(init_weights)
@@ -157,28 +58,28 @@ class CriticNetwork(nn.Module):
         self.net1 = nn.Sequential(
             nn.Linear(state_shape + action_shape[0], num),
             nn.ReLU(inplace=True),
-            nn.Linear(num, num),
-            nn.ReLU(inplace=True),
-            nn.Linear(num, num),
-            nn.ReLU(inplace=True),
             nn.Linear(num, 128),
             nn.ReLU(inplace=True),
             nn.Linear(128, 64),
             nn.ReLU(inplace=True),
+            # nn.Linear(num, 128),
+            # nn.ReLU(inplace=True),
+            # nn.Linear(128, 64),
+            # nn.ReLU(inplace=True),
             nn.Linear(64, 1),
         )
         self.net1.apply(init_weights)
         self.net2 = nn.Sequential(
             nn.Linear(state_shape + action_shape[0], num),
             nn.ReLU(inplace=True),
-            nn.Linear(num, num),
-            nn.ReLU(inplace=True),
-            nn.Linear(num, num),
-            nn.ReLU(inplace=True),
             nn.Linear(num, 128),
             nn.ReLU(inplace=True),
             nn.Linear(128, 64),
             nn.ReLU(inplace=True),
+            # nn.Linear(num, 128),
+            # nn.ReLU(inplace=True),
+            # nn.Linear(128, 64),
+            # nn.ReLU(inplace=True),
             nn.Linear(64, 1),
         )
         self.net2.apply(init_weights)

@@ -114,7 +114,7 @@ class SAC(Algorithm):
         torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 1.0)
         self.optim_actor.step()
         self.entropy_adjust_func(log_pis)
-        return loss_actor.clone().detach()
+        return loss_actor.clone().detach(), log_pis.clone().detach()
 
     def update_target(self):
         for target, trained in zip(self.critic_target.parameters(), self.critic.parameters()):
@@ -125,9 +125,9 @@ class SAC(Algorithm):
         self.learning_steps += 1
         states, actions, rews, dones, n_states = self.buffer.sample(self.batch_size)
         l_c1, l_c2 = self.update_critic(states, actions, rews, dones, n_states)
-        l_a1 = self.update_actor(states)
+        l_a1, log_p = self.update_actor(states)
         self.update_target()
-        return l_a1, l_c1, l_c2
+        return l_a1, log_p, l_c1, l_c2
 
     def entropy_adjust_func(self, log_pis):
         with torch.no_grad():

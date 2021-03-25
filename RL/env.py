@@ -16,10 +16,12 @@ class MyEnv:
         self.env = env_
         self.dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.action_space = env_.action_space
-        self._state_steps = 4
-        self.observation_space = (80, 160, 3*self._state_steps)
+        self._state_frame_len = 3  # stateに変換する時のframeの数
+        self._step_repeat_times = 3  # 同じ行動を繰り返す回数
+        self.observation_space = (80, 160, 3*self._state_frame_len)
         print("obs shape {}".format(self.observation_space))
-        self.state_shape = 32*self._state_steps
+        self.state_shape = 32*self._state_frame_len
+
         # vae
         self.vae = VAE()
         model_path = "./vae/vae_ikeda_ver1_32.pth"
@@ -28,10 +30,9 @@ class MyEnv:
         self._gen_id = 0  # 何回目のgenerateかを保持
         self._frames = []  # mp4生成用にframeを保存
         # pre processing
-        self._state_frames = deque(maxlen=self._state_steps)  # 変換前のframe
+        self._state_frames = deque(maxlen=self._state_frames)  # 変換前のframe
         self._gen_id = 0  # 何回目のgenerateかを保持
         self._frames = []  # mp4生成用にframeを保存
-        self._step_repeat_times = 3
         # self.num_envs = 1
 
     def close(self):
@@ -49,28 +50,20 @@ class MyEnv:
             if done:
                 break
         n_state_return = self.convert_state()  # state 生成
-        rew = self.change_rew(rews/self._step_repeat_times, info)
-        if info["cte"] > 2.5:
-            done = True
-            rew = -1.0
-        elif info["cte"] < -5.0:
-            done = True
-            rew = -1.0
+        rew, done = self._reward_func(done, info)
         return n_state_return, rew, done, info
 
-    def change_rew(self, rew, info):
-        if info["speed"] < 0.0:
-            return -0.6
-        if abs(info["cte"]) < 1.0:
-            rew = info["speed"] / 100.0
+    def _reward_func(self, done, info):  # rewとdoneを変更する
+        omega, omega1 = 10.0, 5.0
+        if (abs(info["cte"]) >= 1.0) or done:
+            return True, -1.0 - info["speed"] / 10.0 / omega
         else:
-            rew = -0.6
-        return rew
+            return False, 0.1 + info["speed"] / 100.0 / omega1
 
     def reset(self):
         rand_step = random.randrange(10)
         self.env.reset()
-        for _ in range(rand_step + self._state_steps):
+        for _ in range(rand_step + self._state_frame_len):
             action = self.env.action_space.sample()
             for i in range(self._step_repeat_times):
                 n_state, _, _, _ = self.env.step(action)
