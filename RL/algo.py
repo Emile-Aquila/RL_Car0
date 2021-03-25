@@ -44,10 +44,7 @@ class Algorithm(ABC):
 
 class ReplayBuffer:
     def __init__(self, buffer_size):
-        self._idx = 0  # 次にデータを挿入するインデックス．
-        self._size = 0  # データ数．
-        self.buffer_size = buffer_size  # リプレイバッファのサイズ．
-        self.buf = replay_buffers.ReplayBuffer(capacity=self.buffer_size)
+        self.buf = replay_buffers.ReplayBuffer(capacity=buffer_size)
         self.dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     def append(self, state, action, reward, done, next_state):

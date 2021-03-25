@@ -19,7 +19,7 @@ NUM_STEPS = 3 * 10 ** 6
 START_STEP = 5 * 10 ** 6
 EVAL_INTERVAL = 5 * 10 ** 4
 BATCH_SIZE = 256
-BUFFER_SIZE = 10*6
+BUFFER_SIZE = 10**6
 
 print("state shape {}".format(*env.observation_space))
 print("action shape {}".format(env.action_space.shape))

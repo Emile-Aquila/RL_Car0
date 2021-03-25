@@ -70,8 +70,6 @@ class SAC(Algorithm):
             action, _ = self.explore(state)
         n_state, rew, done, info = env.step(action)
         self.total_rew += rew
-        # priority = self.actor_loss_func(torch.from_numpy(state).to(self.dev))[0].clone().detach()
-        # print("priori {}".format(priority))
         self.buffer.append(state, action, rew, done, n_state)  # add data to buffer
         if done:  # エピソードが終了した場合には，環境をリセットする．
             t = 0

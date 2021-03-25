@@ -125,7 +125,11 @@ class ActorNetwork(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(num, num),
             nn.ReLU(inplace=True),
-            nn.Linear(num, 64),
+            nn.Linear(num, num),
+            nn.ReLU(inplace=True),
+            nn.Linear(num, 128),
+            nn.ReLU(inplace=True),
+            nn.Linear(128, 64),
             nn.ReLU(inplace=True),
             nn.Linear(64, 2 * action_shape[0]),
         )
@@ -155,7 +159,11 @@ class CriticNetwork(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(num, num),
             nn.ReLU(inplace=True),
-            nn.Linear(num, 64),
+            nn.Linear(num, num),
+            nn.ReLU(inplace=True),
+            nn.Linear(num, 128),
+            nn.ReLU(inplace=True),
+            nn.Linear(128, 64),
             nn.ReLU(inplace=True),
             nn.Linear(64, 1),
         )
@@ -165,7 +173,11 @@ class CriticNetwork(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(num, num),
             nn.ReLU(inplace=True),
-            nn.Linear(num, 64),
+            nn.Linear(num, num),
+            nn.ReLU(inplace=True),
+            nn.Linear(num, 128),
+            nn.ReLU(inplace=True),
+            nn.Linear(128, 64),
             nn.ReLU(inplace=True),
             nn.Linear(64, 1),
         )
@@ -182,14 +194,6 @@ def main():
     env = gym.make("donkey-generated-track-v0", conf=conf)
     env = MyEnv(env)
     print("action space {}".format(env.action_space))
-    # test = ActorNetwork2()
-    # stat = env.reset()
-    # stat = torch.Tensor(stat).permute(0, 3, 1, 2)
-    # act = torch.zeros((1, 2))
-    # test.forward(stat)
-    # test2 = CriticNetwork2()
-    # ans = test2.forward(stat, act)
-    # print("ans {}".format(ans))
 
 
 if __name__ == "__main__":

@@ -24,40 +24,27 @@ def init_weights(m):
 
 
 class Q_Net(nn.Module):
-    def __init__(self):
+    def __init__(self, state_shape, action_shape):
         super().__init__()
-        num = 64
+        num = 256
         self.net1 = nn.Sequential(
-            nn.Conv2d(3, num, 4, stride=2),
+            nn.Linear(state_shape + action_shape[0], num),
             nn.ReLU(inplace=True),
-            nn.Conv2d(num, 64, 4, stride=2),
+            nn.Linear(num, num),
             nn.ReLU(inplace=True),
-            nn.Conv2d(64, 32, 4, stride=2),
+            nn.Linear(num, num),
             nn.ReLU(inplace=True),
-            nn.Conv2d(32, 8, 4, stride=2),
+            nn.Linear(num, 128),
             nn.ReLU(inplace=True),
-            Flatten(),  # torch.Size([1, 192])
-            nn.Linear(192, 64),  # torch.Size([1, 64])
-            # nn.Linear(64, 2 * 2),
-        )
-        self.net2 = nn.Sequential(
-            nn.Linear(2, 64)
-        )
-        self.net3 = nn.Sequential(
-            nn.Linear(64 * 2, 64),
+            nn.Linear(128, 64),
             nn.ReLU(inplace=True),
             nn.Linear(64, 1),
         )
         self.net1.apply(init_weights)
-        self.net2.apply(init_weights)
-        self.net3.apply(init_weights)
 
-    def forward(self, states, acts):
-        s1 = self.net1(states)
-        a1 = self.net2(acts)
-        t1 = torch.cat((s1, a1), dim=-1)
-        out1 = self.net3(t1)
-        return out1
+    def forward(self, states, actions):
+        inputs = torch.cat((states, actions), dim=-1)
+        return self.net1(inputs)
 
 
 def squashed_diagonal_gaussian_head(x):
@@ -81,21 +68,37 @@ def make_env():
     env = MyEnv(env)
     return env
 
-def make_policy():
-    num = 64
+
+def make_policy(state_shape, action_shape):
+    # net = nn.Sequential(
+    #     nn.Conv2d(3, num, 4, stride=2),
+    #     nn.ReLU(inplace=True),
+    #     nn.Conv2d(num, 64, 4, stride=2),
+    #     nn.ReLU(inplace=True),
+    #     nn.Conv2d(64, 32, 4, stride=2),
+    #     nn.ReLU(inplace=True),
+    #     nn.Conv2d(32, 8, 4, stride=2),
+    #     nn.ReLU(inplace=True),
+    #     Flatten(),  # torch.Size([1, 192])
+    #     nn.Linear(192, 64),  # torch.Size([1, 64])
+    #     nn.ReLU(inplace=True),
+    #     nn.Linear(64, 2 * 2),
+    #     Lambda(squashed_diagonal_gaussian_head),
+    # )
+    num = 256
     net = nn.Sequential(
-        nn.Conv2d(3, num, 4, stride=2),
+        # nn.Linear(state_shape[0], num),
+        nn.Linear(state_shape, num),
         nn.ReLU(inplace=True),
-        nn.Conv2d(num, 64, 4, stride=2),
+        nn.Linear(num, num),
         nn.ReLU(inplace=True),
-        nn.Conv2d(64, 32, 4, stride=2),
+        nn.Linear(num, num),
         nn.ReLU(inplace=True),
-        nn.Conv2d(32, 8, 4, stride=2),
+        nn.Linear(num, 128),
         nn.ReLU(inplace=True),
-        Flatten(),  # torch.Size([1, 192])
-        nn.Linear(192, 64),  # torch.Size([1, 64])
+        nn.Linear(128, 64),
         nn.ReLU(inplace=True),
-        nn.Linear(64, 2 * 2),
+        nn.Linear(64, 2 * action_shape[0]),
         Lambda(squashed_diagonal_gaussian_head),
     )
     net.apply(init_weights)
@@ -103,19 +106,22 @@ def make_policy():
 
 
 def train_PFRL_agent():
-    policy = make_policy().to(dev)
-    q_func1 = Q_Net().to(dev)
-    q_func2 = Q_Net().to(dev)
+    env = make_env()
+    policy = make_policy(env.state_shape, env.action_space.shape).to(dev)
+    q_func1 = Q_Net(env.state_shape, env.action_space.shape).to(dev)
+    q_func2 = Q_Net(env.state_shape, env.action_space.shape).to(dev)
     policy_optimizer = torch.optim.Adam(policy.parameters(), lr=3e-4)
     q_func1_optimizer = torch.optim.Adam(q_func1.parameters(), lr=3e-4)
     q_func2_optimizer = torch.optim.Adam(q_func2.parameters(), lr=3e-4)
+
     gamma = 0.99
     gpu = -1
-    replay_start_size = 5 * 10 ** 3
-    minibatch_size = 256
+    replay_start_size = 5 * 10 ** 1
+    # replay_start_size = 0
+    minibatch_size = 1
     max_grad_norm = 0.5
     update_interval = 1
-    replay_buffer = replay_buffers.ReplayBuffer(5 * 10 ** 3)
+    replay_buffer = replay_buffers.ReplayBuffer(10**6)
 
     def burn_in_action_func():
         """Select random actions until model is updated one or more times."""
@@ -126,37 +132,42 @@ def train_PFRL_agent():
                                         q_func2_optimizer, replay_buffer, gamma, gpu, replay_start_size,
                                         minibatch_size, update_interval, max_grad_norm, temperature_optimizer_lr=3e-4,
                                         burnin_action_func=burn_in_action_func)
-    env = make_env()
-    # env1 = make_batch_env(False, env)
-    # env2 = make_batch_env(True, env)
-    # experiments.train_agent_batch_with_evaluation(
-    #     agent=agent,
-    #     env=env,
-    #     eval_env=env,
-    #     outdir="./",
-    #     steps=3 * 10 ** 6,
-    #     eval_n_steps=None,
-    #     eval_n_episodes=2,
-    #     eval_interval=2 * 10 ** 3,
-    #     log_interval=10,
-    #     max_episode_len=None,
-    # )
     eval_interval = 2 * 10 ** 1
-    policy_start_step = 5 * 10 ** 3
+    policy_start_step = 5 * 10 ** 1
+
+    experiments.train_agent_with_evaluation(
+        agent=agent,
+        env=env,
+        steps=3*10**6,
+        eval_n_steps=100,
+        eval_n_episodes=None,
+        eval_interval=1,
+        outdir="./",
+        save_best_so_far_agent=True,
+        eval_env=env,
+    )
     state = env.reset()
+    state_test = state.reshape(1, -1)
+    with agent.eval_mode():
+        agent.act(state_test)
     for i in tqdm(range(3*10**6)):
-        if i // eval_interval == 0 and i is not 0:
+        if i // eval_interval == 0 and i != 0:
             with agent.eval_mode():
                 state = env.reset()
+                state = torch.from_numpy(state).to(dev)
                 r_sum = 0
                 while True:
                     act = agent.act(state)
                     n_state, rew, done, info = env.step(act)
                     r_sum += rew
+                    state = torch.from_numpy(n_state).to(dev)
                     if done:
                         print("step {}: rew is {}.".format(i, r_sum))
                         state = env.reset()
                         break
+        # if i < policy_start_step:
+        #     act = env.action_space.sample()
+        # else:
         act = agent.act(state)
         print("act {}".format(act))
         n_state, rew, done, info = env.step(act)
