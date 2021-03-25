@@ -16,7 +16,7 @@ class MyEnv:
         self.env = env_
         self.dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.action_space = env_.action_space
-        self._state_steps = 3
+        self._state_steps = 4
         self.observation_space = (80, 160, 3*self._state_steps)
         print("obs shape {}".format(self.observation_space))
         self.state_shape = 32*self._state_steps
@@ -31,7 +31,7 @@ class MyEnv:
         self._state_frames = deque(maxlen=self._state_steps)  # 変換前のframe
         self._gen_id = 0  # 何回目のgenerateかを保持
         self._frames = []  # mp4生成用にframeを保存
-        self._step_repeat_times = 2
+        self._step_repeat_times = 3
         # self.num_envs = 1
 
     def close(self):

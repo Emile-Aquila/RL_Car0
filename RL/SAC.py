@@ -102,7 +102,7 @@ class SAC(Algorithm):
         # update
         self.optim_critic.zero_grad()
         (loss_c1 + loss_c2).backward(retain_graph=False)
-        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 0.5)
+        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 1.0)
         self.optim_critic.step()
         return loss_c1.clone().detach(), loss_c2.clone().detach()
 
@@ -111,7 +111,7 @@ class SAC(Algorithm):
         # update
         self.optim_actor.zero_grad()
         loss_actor.backward(retain_graph=False)
-        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 0.5)
+        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 1.0)
         self.optim_actor.step()
         self.entropy_adjust_func(log_pis)
         return loss_actor.clone().detach()

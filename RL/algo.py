@@ -88,8 +88,8 @@ class Trainer:
         self.start_time = time()  # 学習開始の時間
         writer = SummaryWriter(log_dir="./logs")
         dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        writer.add_graph(self.algo.actor, torch.from_numpy(np.zeros(shape=(1,32*3))).float().to(dev))
-        writer.add_graph(self.algo.critic, (torch.from_numpy(np.zeros(shape=(1, 32*3))).float().to(dev),
+        writer.add_graph(self.algo.actor, torch.from_numpy(np.zeros(shape=(1,32*4))).float().to(dev))
+        writer.add_graph(self.algo.critic, (torch.from_numpy(np.zeros(shape=(1, 32*4))).float().to(dev),
                          torch.from_numpy(np.zeros(shape=(1, 2))).float().to(dev)))
 
         t = 0  # エピソードのステップ数．
@@ -106,11 +106,11 @@ class Trainer:
             if steps % self.eval_interval == 0:  # 一定のインターバルで評価する．
                 rew_ave = self.evaluate(steps)
                 writer.add_scalar("evaluate rew", rew_ave, steps)
-                torch.save(self.algo.actor.cpu().state_dict(), '.models/actor.pth')
+                torch.save(self.algo.actor.cpu().state_dict(), './models/actor.pth')
                 self.algo.actor.to(dev)
-                torch.save(self.algo.critic.cpu().state_dict(), '.models/critic.pth')
+                torch.save(self.algo.critic.cpu().state_dict(), './models/critic.pth')
                 self.algo.critic.to(dev)
-                torch.save(self.algo.critic_target.cpu().state_dict(), '.models/c_target.pth')
+                torch.save(self.algo.critic_target.cpu().state_dict(), './models/c_target.pth')
                 self.algo.critic_target.to(dev)
         writer.close()
 
