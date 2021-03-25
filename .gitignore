@@ -1,0 +1,9 @@
+/.idea
+/RL/mp4/*
+/RL/logs/*
+/RL/models/*
+/RL/0_except/*
+/RL/__pycache__/*
+/RL/unitylog.txt
+/RL/scores.txt
+/RL/vae/__pycache__/*

@@ -1,0 +1,27 @@
+SAC : エントロピー最大化項をふくむ学習法
+
+Actor : 方策 : 正規分布のμ,σを出力.
+Critic : Q関数 : soft-Q関数.
+
+1.ソフト方策反復 : エントロピー最大化項を含むように修正したベルマン作用素を用いて学習をすすめる.
+--> V(s) := E[Q(s,a) + α・H(π(・,s))] として学習.
+--> Q(s,a)は J_Q(\theta) = E[1/2 * (Q(s_t,a_t) - (r(s_t,a_t) + γ E[V(s_{t+1})]))^2] の最小化によって学習する.
+
+-> 方策改善には, soft Q関数の指数に近づく様に方策を更新する. : soft-Q funcの softmax分布を近似する.(D_KLを使用)
+
+Z_\theta(s_t) は exp(V(s_t))と同じ感じだと思う. (方策に関係ないので,無視するっぽい)
+
+J(Φ) = E[D_KL(π(・|s_t) || exp(Q(s_t,・)/Z(s_t)))]の最小化を考える. (右辺は soft-Qのsoftmax分布)
+J(Φ) = E_π[log(πΦ(a_t|s_t) - Q(s_t,a_t) + Z )] = E_π[log(πΦ(a_t|s_t) - Q(s_t,a_t)] + Const.(log \int {\exp(Q_θ^(πΦ)(s,a))da} )
+--> E_π[log(πΦ(a_t|s_t) - Q(s_t,a_t)]を最小化する.
+
+a_t = fΦ(ε;s_t)なるfを準備する. これは,平均μと分散σを出力する. (ノイズ項でも学習させられる. 確率的方策ならNからサンプリング, 決定的方策ならμ)
+--> ∇_Φ E_π[log(πΦ(a_t|s_t) - Q(s_t,a_t)] = ∇log(πΦ(a_t|s_t) - ∇Q(s_t,a_t)   <- dQ_θ/dΦ = dQ_θ/da * da/dΦ  : da/dΦは計算不可能 : -> a_t = f_Φ(ε,s_t)に置き換え
+--> a_t = fΦ(ε; s_t) = ε*σ + μ, ε ~ N(0,1)とすればよい.  (ε = (a-μ)/σ から, a ~ N(μ,σ)) : Reparameterization trick
+----> ∇Φ log(πΦ(a_t|s_t) = (\partial (log πΦ) / \partial Φ) * dΦ/dΦ + (\partial (log πΦ) / \partial a) * (da/dΦ) 
+↑
+http://w3e.kanazawa-it.ac.jp/math/category/bibun/henbibun/henkan-tex.cgi?target=/math/category/bibun/henbibun/gouseikansuu-no-henbibun_doushutu1.html
+----> ∇Φ Q(s_t,a_t) = ∇a Qθ(a|s)∇ΦfΦ(ε;s)
+
+よって,求まる.
+
