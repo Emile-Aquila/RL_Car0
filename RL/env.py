@@ -16,7 +16,7 @@ class MyEnv:
         self.env = env_
         self.dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         self.action_space = env_.action_space
-        self._state_frame_len = 3  # stateに変換する時のframeの数
+        self._state_frame_len = 1  # stateに変換する時のframeの数
         self._step_repeat_times = 3  # 同じ行動を繰り返す回数
         self.observation_space = (80, 160, 3*self._state_frame_len)
         print("obs shape {}".format(self.observation_space))
@@ -57,6 +57,8 @@ class MyEnv:
         omega, omega1 = 10.0, 5.0
         if (abs(info["cte"]) >= 1.5) or done:
             return -1.0 - info["speed"] / 10.0 / omega, True
+        elif info["speed"] < -1.0:
+            return -1.0 + info["speed"] / 10.0 / omega, True
         else:
             return 0.1 + info["speed"] / 100.0 / omega1, False
 

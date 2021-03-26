@@ -121,8 +121,8 @@ class Trainer:
         self.start_time = time()  # 学習開始の時間
         writer = SummaryWriter(log_dir="./logs")
         dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        writer.add_graph(self.algo.actor, torch.from_numpy(np.zeros(shape=(1, 32*3))).float().to(dev))
-        writer.add_graph(self.algo.critic, (torch.from_numpy(np.zeros(shape=(1, 32*3))).float().to(dev),
+        writer.add_graph(self.algo.actor, torch.from_numpy(np.zeros(shape=(1, 32*1))).float().to(dev))
+        writer.add_graph(self.algo.critic, (torch.from_numpy(np.zeros(shape=(1, 32*1))).float().to(dev),
                          torch.from_numpy(np.zeros(shape=(1, 2))).float().to(dev)))
 
         t = 0  # エピソードのステップ数．

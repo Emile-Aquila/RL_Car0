@@ -22,7 +22,7 @@ def show_state(state_np):
 class SAC(Algorithm):
     def __init__(self, state_shape, action_shape, seed=0, batch_size=256, gamma=0.99, lr_actor=3e-4,
                  lr_critic=3e-4, lr_alpha=3e-4, buffer_size=5 * 10 ** 3, start_steps=5 * 10 ** 3, tau=5e-3,
-                 min_alpha=0.3, reward_scale=1.0, epsilon=0.1):
+                 min_alpha=0.3, reward_scale=1.0, epsilon=0.05):
         super().__init__()
 
         self.dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -108,7 +108,7 @@ class SAC(Algorithm):
         # update
         self.optim_critic.zero_grad()
         (loss_c1 + loss_c2).backward(retain_graph=False)
-        # torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 1.0)
+        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 1.0)
         self.optim_critic.step()
         return loss_c1.clone().detach(), loss_c2.clone().detach()
 
@@ -117,7 +117,7 @@ class SAC(Algorithm):
         # update
         self.optim_actor.zero_grad()
         loss_actor.backward(retain_graph=False)
-        # torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 1.0)
+        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 1.0)
         self.optim_actor.step()
         return loss_actor.clone().detach(), log_pis.clone().detach()
 
