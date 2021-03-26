@@ -22,7 +22,7 @@ def show_state(state_np):
 class SAC(Algorithm):
     def __init__(self, state_shape, action_shape, seed=0, batch_size=256, gamma=0.99, lr_actor=3e-4,
                  lr_critic=3e-4, lr_alpha=3e-4, buffer_size=5 * 10 ** 3, start_steps=5 * 10 ** 3, tau=5e-3,
-                 min_alpha=0.3, reward_scale=1.0, epsilon=0.05):
+                 min_alpha=0.3, reward_scale=1.0, epsilon=0.00):
         super().__init__()
 
         self.dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -72,6 +72,7 @@ class SAC(Algorithm):
         t += 1
         if steps <= self.start_steps or (self.epsilon >= random.random()):  # 最初はランダム.
             action = env.action_space.sample()
+            action[1] = action[1] * 2.0 - 1.0
         else:
             action, _ = self.explore(state)
         n_state, rew, done, info = env.step(action)
