@@ -99,10 +99,11 @@ class Trainer:
             # アルゴリズムに渡し，状態・エピソードのステップ数を更新する．
             state, t = self.algo.step(self.env, state, t, steps)
             if self.algo.is_update(steps):  # アルゴリズムが準備できていれば，1回学習を行う．
-                l_a1, l_c1, l_c2 = self.algo.update()
+                l_a1, log_ps, l_c1, l_c2 = self.algo.update()
                 writer.add_scalar("actor loss", l_a1, steps)
                 writer.add_scalar("critic loss1", l_c1, steps)
                 writer.add_scalar("critic loss2", l_c2, steps)
+                writer.add_scalar("log pi", log_ps[0], steps)
             if steps % self.eval_interval == 0:  # 一定のインターバルで評価する．
                 rew_ave = self.evaluate(steps)
                 writer.add_scalar("evaluate rew", rew_ave, steps)
@@ -155,24 +156,40 @@ class Trainer:
         return str(timedelta(seconds=int(time() - self.start_time)))
 
 
-def calc_log_pi(stds, noises, actions):
-    #  calc : \log\pi(a|s) = \log p(u|s) - \sum_{i=1}^{|\mathcal{A}|} \log (1 - \tanh^{2}(u_i))
-    #  これは, \epsilon * \sigma ~ N(0, \sigma)なる確率密度の対数を計算する関数.
-    # act = tanh(\mu + \epsilon*\sigma) より, log \pi(a|s) = log p(u|s) - log (1 - tanh'(u)),  (u = \mu + \epsilon*\sigma)
-    gaussian_log_probs = torch.distributions.Normal(torch.zeros_like(stds), stds).log_prob(noises).sum(dim=-1,
-                                                                                                       keepdim=True)
+def calc_log_pi(log_stds, noises, actions):
+    """ 確率論的な行動の確率密度を返す． """
+    # ガウス分布 `N(0, stds * I)` における `noises * stds` の確率密度の対数(= \log \pi(u|a))を計算する．
+    # (torch.distributions.Normalを使うと無駄な計算が生じるので，下記では直接計算しています．)
+    # gaussian_log_probs = \
+    #     (-0.5 * noises.pow(2) - log_stds).sum(dim=-1, keepdim=True) - 0.5 * math.log(2 * math.pi) * log_stds.size(-1)
+
+    # # tanh による確率密度の変化を修正する．
+    # log_pis = gaussian_log_probs - torch.log(1 - actions.pow(2) + 1e-6).sum(dim=-1, keepdim=True)
+    stds = log_stds.exp()
+    gaussian_log_probs = torch.distributions.Normal(torch.zeros_like(stds), stds).log_prob(stds * noises).sum(dim=-1, keepdim=True)
+
+    # NOTE: gaussian_log_probs には (batch_size, 1) で表された確率密度の対数 \log p(u|s) が入っています．
+
+    # [演習] その後，tanh による確率密度の変化を修正しましょう．
+    # (例)
+    # log_pis = gaussian_log_probs - ...
     log_pis = gaussian_log_probs - torch.log(1.0 - actions.pow(2) + 1e-6).sum(dim=-1, keepdim=True)
+
     return log_pis
 
 
 def reparameterize(means, log_stds):
-    # acts ~ N(means, stds), log_pis = f(acts), f:N(means, stds)
+    """ Reparameterization Trickを用いて，確率論的な行動とその確率密度を返す． """
+    # 標準偏差．
     stds = log_stds.exp()
-    noises = stds * torch.randn_like(means)
-    tmp = noises + means  # tmp ~ N(means, stds)
-    acts = torch.tanh(tmp)
-    log_pis = calc_log_pi(stds=stds, noises=noises, actions=acts)
-    return acts, log_pis
+    # 標準ガウス分布から，ノイズをサンプリングする．
+    noises = torch.randn_like(means)
+    # Reparameterization Trickを用いて，N(means, stds)からのサンプルを計算する．
+    us = means + noises * stds
+    # tanh　を適用し，確率論的な行動を計算する．
+    actions = torch.tanh(us)
 
+    # 確率論的な行動の確率密度の対数を計算する．
+    log_pis = calc_log_pi(log_stds, noises, actions)
 
-
+    return actions, log_pis

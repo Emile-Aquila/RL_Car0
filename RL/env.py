@@ -43,7 +43,7 @@ class MyEnv:
         for i in range(self._step_repeat_times):
             n_state, rew, done, info = self.env.step(action)
             rews += rew
-            if i == 0:
+            if i == self._step_repeat_times-1:
                 self._state_frames.append(self.adjust_picture(n_state))
             if show:
                 self._frames.append(np.array(n_state))
@@ -61,13 +61,14 @@ class MyEnv:
             return 0.1 + info["speed"] / 100.0 / omega1, False
 
     def reset(self):
-        rand_step = random.randrange(10)
+        rand_step = random.randrange(5)
+        rand_step += self._state_frame_len
         self.env.reset()
-        for _ in range(rand_step + self._state_frame_len):
+        for _ in range(rand_step):
             action = self.env.action_space.sample()
             for i in range(self._step_repeat_times):
                 n_state, _, _, _ = self.env.step(action)
-                if i == 0:
+                if i == self._state_frame_len-1:
                     self._state_frames.append(self.adjust_picture(n_state))
         state = self.convert_state()
         return state

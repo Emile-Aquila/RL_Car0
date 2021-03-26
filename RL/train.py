@@ -16,10 +16,11 @@ env = MyEnv(env)
 SEED = 0
 REWARD_SCALE = 1.0
 NUM_STEPS = 3 * 10 ** 6
-START_STEP = 5 * 10 ** 3
+START_STEP = 1 * 10 ** 2
 EVAL_INTERVAL = 1 * 10 ** 4
-BATCH_SIZE = 256
-BUFFER_SIZE = 10 ** 6
+BATCH_SIZE = 64
+# BUFFER_SIZE = 10 ** 6
+BUFFER_SIZE = 5 * 10 ** 4
 
 print("state shape {}".format(*env.observation_space))
 print("action shape {}".format(env.action_space.shape))

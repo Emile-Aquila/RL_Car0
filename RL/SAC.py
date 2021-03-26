@@ -5,6 +5,7 @@ from algo import Algorithm, ReplayBuffer
 from PIL import Image
 import gym_donkeycar
 import gym
+import random
 
 
 def show_state(state_np):
@@ -19,9 +20,9 @@ def show_state(state_np):
 
 
 class SAC(Algorithm):
-    def __init__(self, state_shape, action_shape, seed=0,
-                 batch_size=256, gamma=0.99, lr_actor=3e-4, lr_critic=3e-4, lr_alpha=3e-4,
-                 buffer_size=5 * 10 ** 3, start_steps=5 * 10 ** 3, tau=5e-3, min_alpha=0.1, reward_scale=1.0):
+    def __init__(self, state_shape, action_shape, seed=0, batch_size=256, gamma=0.99, lr_actor=3e-4,
+                 lr_critic=3e-4, lr_alpha=3e-4, buffer_size=5 * 10 ** 3, start_steps=5 * 10 ** 3, tau=5e-3,
+                 min_alpha=0.01, reward_scale=1.0, epsilon=0.01):
         super().__init__()
 
         self.dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -58,13 +59,14 @@ class SAC(Algorithm):
         self.batch_size = batch_size
         self.learning_steps = 0
         self.total_rew = 0.0
+        self.epsilon = epsilon
 
     def is_update(self, steps):
         return steps >= max(self.start_steps, self.batch_size)
 
     def step(self, env, state, t, steps):
         t += 1
-        if steps <= self.start_steps:  # 最初はランダム.
+        if steps <= self.start_steps or (self.epsilon >= random.random()):  # 最初はランダム.
             action = env.action_space.sample()
         else:
             action, _ = self.explore(state)

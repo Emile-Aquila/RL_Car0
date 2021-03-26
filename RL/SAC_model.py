@@ -85,7 +85,7 @@ class CriticNetwork(nn.Module):
         self.net2.apply(init_weights)
 
     def forward(self, states, actions):
-        inputs = torch.cat((states, actions), dim=-1)
+        inputs = torch.cat([states, actions], dim=-1)
         return self.net1(inputs), self.net2(inputs)
 
 
