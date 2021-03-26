@@ -22,7 +22,7 @@ def show_state(state_np):
 class SAC(Algorithm):
     def __init__(self, state_shape, action_shape, seed=0, batch_size=256, gamma=0.99, lr_actor=3e-4,
                  lr_critic=3e-4, lr_alpha=3e-4, buffer_size=5 * 10 ** 3, start_steps=5 * 10 ** 3, tau=5e-3,
-                 min_alpha=0.3, reward_scale=1.0, epsilon=0.01):
+                 min_alpha=0.3, reward_scale=1.0, epsilon=0.1):
         super().__init__()
 
         self.dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')

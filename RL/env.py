@@ -96,6 +96,7 @@ class MyEnv:
     def convert_state_vae(self, state):
         state_ = self.convert_state_to_tensor(state)
         state_, _, _ = self.vae.encode(state_)
+        state_ /= 255.0
         state_ = state_.clone().detach().cpu().numpy()[0]
         return state_
 
