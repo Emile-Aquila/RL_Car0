@@ -147,6 +147,7 @@ class Trainer:
                 self.algo.critic.to(dev)
                 torch.save(self.algo.critic_target.cpu().state_dict(), './models/c_target.pth')
                 self.algo.critic_target.to(dev)
+                state = self.env.reset()
         writer.close()
 
     def evaluate(self, steps):  # 複数エピソード環境を動かし，平均収益を記録する．
