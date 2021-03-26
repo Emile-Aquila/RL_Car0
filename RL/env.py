@@ -40,6 +40,7 @@ class MyEnv:
 
     def step(self, action, show=False):
         rews = 0.0
+        action[1] = (action[1] + 1.0) / 2.0
         for i in range(self._step_repeat_times):
             n_state, rew, done, info = self.env.step(action)
             rews += rew
@@ -57,8 +58,6 @@ class MyEnv:
         omega, omega1 = 10.0, 5.0
         if (abs(info["cte"]) >= 1.5) or done:
             return -1.0 - info["speed"] / 10.0 / omega, True
-        elif info["speed"] < -0.1:
-            return -1.0 + info["speed"] / 10.0 / omega, True
         else:
             return 0.1 + info["speed"] / 100.0 / omega1, False
 
@@ -68,6 +67,7 @@ class MyEnv:
         self.env.reset()
         for _ in range(rand_step):
             action = self.env.action_space.sample()
+            action[1] = action[1] * 2.0 - 1.0
             for i in range(self._step_repeat_times):
                 n_state, _, _, _ = self.env.step(action)
                 if i == self._state_frame_len-1:

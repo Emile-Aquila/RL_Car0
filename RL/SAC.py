@@ -72,6 +72,7 @@ class SAC(Algorithm):
         t += 1
         if steps <= self.start_steps or (self.epsilon >= random.random()):  # 最初はランダム.
             action = env.action_space.sample()
+            action[1] = action[1] * 2.0 - 1.0
         else:
             action, _ = self.explore(state)
         n_state, rew, done, info = env.step(action)
