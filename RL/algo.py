@@ -42,32 +42,65 @@ class Algorithm(ABC):
         pass
 
 
+# class ReplayBuffer:
+#     def __init__(self, buffer_size):
+#         self.buf = replay_buffers.ReplayBuffer(capacity=buffer_size)
+#         self.dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+#
+#     def append(self, state, action, reward, done, next_state):
+#         state_ = torch.from_numpy(state)
+#         act_ = torch.from_numpy(action)
+#         n_state_ = torch.from_numpy(next_state)
+#         self.buf.append(state_, act_, torch.Tensor([reward]), n_state_, is_state_terminal=done)
+#
+#     def sample(self, batch_size):
+#         states, acts, rews, dones, n_states = [], [], [], [], []
+#         for obs in self.buf.sample(batch_size):
+#             states.append(obs[0]["state"])
+#             acts.append(obs[0]["action"])
+#             rews.append(obs[0]["reward"])
+#             dones.append(torch.Tensor([float(obs[0]["is_state_terminal"])]))
+#             n_states.append(obs[0]["next_state"])
+#         states = torch.cat(states).reshape(len(states), *states[0].shape).to(self.dev)
+#         n_states = torch.cat(n_states).reshape(len(n_states), *n_states[0].shape).to(self.dev)
+#         acts = torch.cat(acts).reshape(len(acts), *acts[0].shape).to(self.dev)
+#         rews = torch.cat(rews).reshape(len(rews), *rews[0].shape).to(self.dev)
+#         dones = torch.cat(dones).reshape(len(dones), *dones[0].shape).to(self.dev)
+#         ans = (states, acts, rews, dones, n_states)
+#         return ans
 class ReplayBuffer:
-    def __init__(self, buffer_size):
-        self.buf = replay_buffers.ReplayBuffer(capacity=buffer_size)
+    def __init__(self, buffer_size, state_shape, action_shape):
+        self._idx = 0  # 次にデータを挿入するインデックス．
+        self._size = 0  # データ数．
+        self.buffer_size = buffer_size  # リプレイバッファのサイズ．
+
         self.dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        self.states = torch.empty((buffer_size, state_shape), dtype=torch.float, device=self.dev)
+        self.actions = torch.empty((buffer_size, *action_shape), dtype=torch.float, device=self.dev)
+        self.rewards = torch.empty((buffer_size, 1), dtype=torch.float, device=self.dev)
+        self.dones = torch.empty((buffer_size, 1), dtype=torch.float, device=self.dev)
+        self.next_states = torch.empty((buffer_size, state_shape), dtype=torch.float, device=self.dev)
 
     def append(self, state, action, reward, done, next_state):
-        state_ = torch.from_numpy(state)
-        act_ = torch.from_numpy(action)
-        n_state_ = torch.from_numpy(next_state)
-        self.buf.append(state_, act_, torch.Tensor([reward]), n_state_, is_state_terminal=done)
+        stat = torch.from_numpy(state)
+        self.states[self._idx].copy_(torch.from_numpy(state))
+        self.actions[self._idx].copy_(torch.from_numpy(action))
+        self.rewards[self._idx] = float(reward)
+        self.dones[self._idx] = float(done)
+        self.next_states[self._idx].copy_(torch.from_numpy(next_state))
+
+        self._idx = (self._idx + 1) % self.buffer_size
+        self._size = min(self._size + 1, self.buffer_size)
 
     def sample(self, batch_size):
-        states, acts, rews, dones, n_states = [], [], [], [], []
-        for obs in self.buf.sample(batch_size):
-            states.append(obs[0]["state"])
-            acts.append(obs[0]["action"])
-            rews.append(obs[0]["reward"])
-            dones.append(torch.Tensor([float(obs[0]["is_state_terminal"])]))
-            n_states.append(obs[0]["next_state"])
-        states = torch.cat(states).reshape(len(states), *states[0].shape).to(self.dev)
-        n_states = torch.cat(n_states).reshape(len(n_states), *n_states[0].shape).to(self.dev)
-        acts = torch.cat(acts).reshape(len(acts), *acts[0].shape).to(self.dev)
-        rews = torch.cat(rews).reshape(len(rews), *rews[0].shape).to(self.dev)
-        dones = torch.cat(dones).reshape(len(dones), *dones[0].shape).to(self.dev)
-        ans = (states, acts, rews, dones, n_states)
-        return ans
+        indexes = np.random.randint(low=0, high=self._size, size=batch_size)
+        return (
+            self.states[indexes],
+            self.actions[indexes],
+            self.rewards[indexes],
+            self.dones[indexes],
+            self.next_states[indexes]
+        )
 
 
 class Trainer:
@@ -159,20 +192,10 @@ class Trainer:
 def calc_log_pi(log_stds, noises, actions):
     """ 確率論的な行動の確率密度を返す． """
     # ガウス分布 `N(0, stds * I)` における `noises * stds` の確率密度の対数(= \log \pi(u|a))を計算する．
-    # (torch.distributions.Normalを使うと無駄な計算が生じるので，下記では直接計算しています．)
-    # gaussian_log_probs = \
-    #     (-0.5 * noises.pow(2) - log_stds).sum(dim=-1, keepdim=True) - 0.5 * math.log(2 * math.pi) * log_stds.size(-1)
-
-    # # tanh による確率密度の変化を修正する．
-    # log_pis = gaussian_log_probs - torch.log(1 - actions.pow(2) + 1e-6).sum(dim=-1, keepdim=True)
     stds = log_stds.exp()
     gaussian_log_probs = torch.distributions.Normal(torch.zeros_like(stds), stds).log_prob(stds * noises).sum(dim=-1, keepdim=True)
 
-    # NOTE: gaussian_log_probs には (batch_size, 1) で表された確率密度の対数 \log p(u|s) が入っています．
-
-    # [演習] その後，tanh による確率密度の変化を修正しましょう．
-    # (例)
-    # log_pis = gaussian_log_probs - ...
+    # tanh による確率密度の変化を修正する．
     log_pis = gaussian_log_probs - torch.log(1.0 - actions.pow(2) + 1e-6).sum(dim=-1, keepdim=True)
 
     return log_pis

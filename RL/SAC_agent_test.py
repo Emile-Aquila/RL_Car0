@@ -11,6 +11,12 @@ from torch import distributions
 import numpy as np
 
 dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+from gym.envs.registration import register
+
+register(
+    id='myenv-v2',
+    entry_point='env:MyEnv2'
+)
 
 
 class Flatten(nn.Module):
@@ -30,10 +36,10 @@ class Q_Net(nn.Module):
         self.net1 = nn.Sequential(
             nn.Linear(state_shape + action_shape[0], num),
             nn.ReLU(inplace=True),
-            nn.Linear(num, num),
-            nn.ReLU(inplace=True),
-            nn.Linear(num, num),
-            nn.ReLU(inplace=True),
+            # nn.Linear(num, num),
+            # nn.ReLU(inplace=True),
+            # nn.Linear(num, num),
+            # nn.ReLU(inplace=True),
             nn.Linear(num, 128),
             nn.ReLU(inplace=True),
             nn.Linear(128, 64),
@@ -66,6 +72,7 @@ def make_env():
     conf = {"exe_path": exe_path, "port": 9091}
     env = gym.make("donkey-generated-track-v0", conf=conf)
     env = MyEnv(env)
+    # env = gym.make("myenv-v2", conf=conf)
     return env
 
 
@@ -90,10 +97,10 @@ def make_policy(state_shape, action_shape):
         # nn.Linear(state_shape[0], num),
         nn.Linear(state_shape, num),
         nn.ReLU(inplace=True),
-        nn.Linear(num, num),
-        nn.ReLU(inplace=True),
-        nn.Linear(num, num),
-        nn.ReLU(inplace=True),
+        # nn.Linear(num, num),
+        # nn.ReLU(inplace=True),
+        # nn.Linear(num, num),
+        # nn.ReLU(inplace=True),
         nn.Linear(num, 128),
         nn.ReLU(inplace=True),
         nn.Linear(128, 64),
@@ -107,6 +114,9 @@ def make_policy(state_shape, action_shape):
 
 def train_PFRL_agent():
     env = make_env()
+    env = pfrl.wrappers.CastObservationToFloat32(env)
+    env = pfrl.wrappers.NormalizeActionSpace(env)
+
     policy = make_policy(env.state_shape, env.action_space.shape).to(dev)
     q_func1 = Q_Net(env.state_shape, env.action_space.shape).to(dev)
     q_func2 = Q_Net(env.state_shape, env.action_space.shape).to(dev)
@@ -125,7 +135,11 @@ def train_PFRL_agent():
 
     def burn_in_action_func():
         """Select random actions until model is updated one or more times."""
-        return np.random.uniform(-1, 1, size=2).astype(np.float32)
+        print("burn in action func")
+        ans = np.random.uniform(-1, 1, size=2).astype(np.float32)
+        print("ans shape {}, ans type {}".format(ans.shape, type(ans)))
+        return ans
+
     print(torch.cuda.is_available())
     agent = pfrl.agents.SoftActorCritic(policy,
                                         q_func1, q_func2, policy_optimizer, q_func1_optimizer,
@@ -135,19 +149,22 @@ def train_PFRL_agent():
     eval_interval = 2 * 10 ** 1
     policy_start_step = 5 * 10 ** 1
 
-    experiments.train_agent_with_evaluation(
-        agent=agent,
-        env=env,
-        steps=3*10**6,
-        eval_n_steps=100,
-        eval_n_episodes=None,
-        eval_interval=1,
-        outdir="./",
-        save_best_so_far_agent=True,
-        eval_env=env,
-    )
+    # experiments.train_agent_with_evaluation(
+    #     agent=agent,
+    #     env=env,
+    #     steps=3*10**6,
+    #     eval_n_steps=100,
+    #     eval_n_episodes=None,
+    #     eval_interval=1,
+    #     outdir="./",
+    #     save_best_so_far_agent=True,
+    #     eval_env=env,
+    # )
     state = env.reset()
     state_test = state.reshape(1, -1)
+    print("state shape {}, type {}".format(state.shape, type(state)))
+    print("state_test shape {}, type {}".format(state_test.shape, type(state_test)))
+
     with agent.eval_mode():
         agent.act(state_test)
     for i in tqdm(range(3*10**6)):
