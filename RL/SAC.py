@@ -119,6 +119,7 @@ class SAC(Algorithm):
         loss_actor.backward(retain_graph=False)
         torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 1.0)
         self.optim_actor.step()
+        self.entropy_adjust_func(log_pis)
         return loss_actor.clone().detach(), log_pis.clone().detach()
 
     def update_target(self):
