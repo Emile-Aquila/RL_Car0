@@ -137,6 +137,7 @@ class Trainer:
                 writer.add_scalar("critic loss1", l_c1, steps)
                 writer.add_scalar("critic loss2", l_c2, steps)
                 writer.add_scalar("log pi", log_ps[0], steps)
+                writer.add_scalar("alpha", self.algo.alpha.clone().detach().numpy(), steps)
             if steps % self.eval_interval == 0:  # 一定のインターバルで評価する．
                 rew_ave = self.evaluate(steps)
                 writer.add_scalar("evaluate rew", rew_ave, steps)

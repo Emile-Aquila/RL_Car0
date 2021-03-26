@@ -24,15 +24,13 @@ class ActorNetwork(nn.Module):
             # nn.Linear(state_shape[0], num),
             nn.Linear(state_shape, num),
             nn.ReLU(inplace=True),
-            nn.Linear(num, 128),
+            nn.Linear(num, num),
             nn.ReLU(inplace=True),
-            nn.Linear(128, 64),
+            nn.Linear(num, num),
             nn.ReLU(inplace=True),
-            # nn.Linear(num, 128),
-            # nn.ReLU(inplace=True),
-            # nn.Linear(128, 64),
-            # nn.ReLU(inplace=True),
-            nn.Linear(64, 2 * action_shape[0]),
+            nn.Linear(num, num),
+            nn.ReLU(inplace=True),
+            nn.Linear(num, 2 * action_shape[0]),
         )
         self.net.apply(init_weights)
 
@@ -47,8 +45,7 @@ class ActorNetwork(nn.Module):
         if deterministic:
             return torch.tanh(means)
         else:
-            log_stds = torch.clip(log_stds, -20.0, 2.0)
-            return reparameterize(means, log_stds)
+            return reparameterize(means, log_stds.clamp(-20, 2))
 
 
 class CriticNetwork(nn.Module):
@@ -58,29 +55,21 @@ class CriticNetwork(nn.Module):
         self.net1 = nn.Sequential(
             nn.Linear(state_shape + action_shape[0], num),
             nn.ReLU(inplace=True),
-            nn.Linear(num, 128),
+            nn.Linear(num, num),
             nn.ReLU(inplace=True),
-            nn.Linear(128, 64),
+            nn.Linear(num, num),
             nn.ReLU(inplace=True),
-            # nn.Linear(num, 128),
-            # nn.ReLU(inplace=True),
-            # nn.Linear(128, 64),
-            # nn.ReLU(inplace=True),
-            nn.Linear(64, 1),
+            nn.Linear(num, 1),
         )
         self.net1.apply(init_weights)
         self.net2 = nn.Sequential(
             nn.Linear(state_shape + action_shape[0], num),
             nn.ReLU(inplace=True),
-            nn.Linear(num, 128),
+            nn.Linear(num, num),
             nn.ReLU(inplace=True),
-            nn.Linear(128, 64),
+            nn.Linear(num, num),
             nn.ReLU(inplace=True),
-            # nn.Linear(num, 128),
-            # nn.ReLU(inplace=True),
-            # nn.Linear(128, 64),
-            # nn.ReLU(inplace=True),
-            nn.Linear(64, 1),
+            nn.Linear(num, 1),
         )
         self.net2.apply(init_weights)
 
