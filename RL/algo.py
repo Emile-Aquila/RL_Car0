@@ -150,29 +150,30 @@ class Trainer:
         writer.close()
 
     def evaluate(self, steps):  # 複数エピソード環境を動かし，平均収益を記録する．
-        returns = []
-        ave_rew = 0.0
+        returns, episode_steps = [], []
         for _ in range(self.num_eval_episodes):
             state = self.env_test.reset()
-            done = False
             episode_return = 0.0
-            while (not done):
+            for i in range(600):
                 action = self.algo.exploit(state)
                 # print(" eval action {}".format(action))
                 state, reward, done, _ = self.env_test.step(action, True)
                 episode_return += reward
-            ave_rew += episode_return
+                if done:
+                    episode_steps.append(i+1)
+                    break
             returns.append(episode_return)
-        ave_rew /= self.num_eval_episodes
         mean_return = np.mean(returns)
+        mean_step = np.mean(episode_steps)
         self.returns['step'].append(steps)
         self.returns['return'].append(mean_return)
 
-        print(f'Num steps: {steps:<6}   '
+        print(f'Num steps: {steps:<6}'
+              f'Episode steps:{mean_step} '
               f'Return: {mean_return:<5.1f}   '
               f'Time: {self.time}')
         self.env_test.generate_mp4()
-        return ave_rew
+        return mean_return
 
     def plot(self):
         """ 平均収益のグラフを描画する． """

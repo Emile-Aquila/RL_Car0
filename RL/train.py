@@ -15,9 +15,9 @@ env = MyEnv(env)
 
 SEED = 0
 REWARD_SCALE = 1.0
-NUM_STEPS = 3 * 10 ** 6
+NUM_STEPS = 2 * 10 ** 4
 START_STEP = 1 * 10 ** 2
-EVAL_INTERVAL = 2 * 10 ** 3
+EVAL_INTERVAL = 1 * 10 ** 3
 BATCH_SIZE = 64
 # BUFFER_SIZE = 10 ** 6
 BUFFER_SIZE = 5 * 10 ** 4
