@@ -59,11 +59,15 @@ class CriticNetwork(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(num, num),
             nn.ReLU(inplace=True),
+            nn.Linear(num, num),
+            nn.ReLU(inplace=True),
             nn.Linear(num, 1),
         )
         self.net1.apply(init_weights)
         self.net2 = nn.Sequential(
             nn.Linear(state_shape + action_shape[0], num),
+            nn.ReLU(inplace=True),
+            nn.Linear(num, num),
             nn.ReLU(inplace=True),
             nn.Linear(num, num),
             nn.ReLU(inplace=True),

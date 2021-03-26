@@ -57,7 +57,7 @@ class MyEnv:
         omega, omega1 = 10.0, 5.0
         if (abs(info["cte"]) >= 1.5) or done:
             return -1.0 - info["speed"] / 10.0 / omega, True
-        elif info["speed"] < -1.0:
+        elif info["speed"] < -0.1:
             return -1.0 + info["speed"] / 10.0 / omega, True
         else:
             return 0.1 + info["speed"] / 100.0 / omega1, False
