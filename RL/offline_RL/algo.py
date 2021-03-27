@@ -2,10 +2,12 @@ import torch
 import torch.nn as nn
 import numpy as np
 import math
+from tqdm import tqdm
+dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 
 class SerializedBuffer:
-    def __init__(self, path, device=torch.device('cuda')):
+    def __init__(self, path, device=dev):
         tmp = torch.load(path)
         self.buffer_size = self._n = tmp['state'].size(0)
         self.device = device
@@ -27,7 +29,7 @@ class SerializedBuffer:
 
 
 class Buffer(SerializedBuffer):
-    def __init__(self, buffer_size, state_shape, action_shape, device=torch.device('cuda')):
+    def __init__(self, buffer_size, state_shape, action_shape, device=dev):
         self._p = 0
         self._n = 0
         self.buffer_size = buffer_size
@@ -60,7 +62,7 @@ class Buffer(SerializedBuffer):
 
 
 class RolloutBuffer:
-    def __init__(self, buffer_size, state_shape, action_shape, device=torch.device('cuda')):
+    def __init__(self, buffer_size, state_shape, action_shape, device=dev):
         self.states = torch.empty((buffer_size + 1, *state_shape), dtype=torch.float, device=device)
         self.actions = torch.empty((buffer_size, *action_shape), dtype=torch.float, device=device)
         self.rewards = torch.empty((buffer_size, 1), dtype=torch.float, device=device)
@@ -134,3 +136,56 @@ def calculate_advantage(values, rewards, dones, gamma=0.995, lambd=0.997):
 
     targets = gaes + values[:-1]
     return targets, (gaes - gaes.mean()) / (gaes.std() + 1e-8)
+
+
+def add_random_noise(action, std):
+    """ データ収集時に，行動にガウスノイズを載せる． """
+    action += np.random.randn(*action.shape) * std
+    return action.clip(-1.0, 1.0)
+
+
+def collect_data(sac_agent, env, weight_path, buffer_size, std=0.0, p_rand=0.0, device=torch.device('cuda'), seed=0):
+    # # 環境を構築する．
+    # 学習済みの重みを読み込む．
+    # sac_agent.actor.load(weight_path)
+    sac_agent.actor.load_state_dict(torch.load(weight_path))
+    sac_agent.to(dev)
+    # シードを設定する．
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    # GPU上にリプレイバッファを作成する．
+    buffer = Buffer(buffer_size, env.observation_space.shape, env.action_space.shape, device)
+    # エキスパートの平均収益を記録する．
+    total_return = 0.0
+    num_episodes = 0
+    # 環境を初期化する．
+    state = env.reset()
+    t = 0
+    episode_return = 0.0
+    for steps in tqdm(range(1, buffer_size + 1)):
+        t += 1
+        # ノイズを加えつつ，行動選択する．
+        if np.random.rand() < p_rand:
+            action = env.action_space.sample()
+        else:
+            action = sac_agent(torch.tensor(state, dtype=torch.float, device=device).unsqueeze_(0)).cpu().numpy()[0]
+            action = add_random_noise(action, std)
+        # 環境を1ステップ進める．
+        next_state, reward, done, _ = env.step(action)
+        episode_return += reward
+        # ゲームオーバーではなく，最大ステップ数に到達したことでエピソードが終了した場合は，
+        # 本来であればその先もMDPが継続するはず．よって，終了シグナルをFalseにする．
+        mask = False if t == env._max_episode_steps else done
+        # リプレイバッファにデータを追加する．
+        buffer.append(state, action, reward, mask, next_state)
+        # エピソードが終了した場合には，環境をリセットする．
+        if done:
+            total_return += episode_return
+            num_episodes += 1
+            state = env.reset()
+            t = 0
+            episode_return = 0.0
+        state = next_state
+    print(f'Mean return of the expert is {total_return / num_episodes:.2f}．')
+    return buffer

@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from algo import RolloutBuffer
-from models import PPOActor, PPOCritic
-
+from offline_RL.algo import RolloutBuffer
+from offline_RL.models import PPOActor, PPOCritic
+dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 def calculate_advantage(values, rewards, dones, gamma=0.995, lambd=0.997):
     """ GAEを用いて，状態価値のターゲットとGAEを計算する． """
@@ -20,7 +20,7 @@ def calculate_advantage(values, rewards, dones, gamma=0.995, lambd=0.997):
 
 
 class PPO:
-    def __init__(self, state_shape, action_shape, device=torch.device('cuda'), seed=0,
+    def __init__(self, state_shape, action_shape, device=dev, seed=0,
                  batch_size=2048, lr=3e-4, gamma=0.995, rollout_length=2048, epoch_ppo=50,
                  clip_eps=0.2, lambd=0.97, coef_ent=0.0, max_grad_norm=10.):
 
@@ -74,14 +74,10 @@ class PPO:
 
         action, log_pi = self.explore(state)
         next_state, reward, done, _ = env.step(action)
-
         # ゲームオーバーではなく，最大ステップ数に到達したことでエピソードが終了した場合は，
         # 本来であればその先もMDPが継続するはず．よって，終了シグナルをFalseにする．
         mask = False if t == env._max_episode_steps else done
-
-        # バッファにデータを追加する．
         self.buffer.append(state, action, reward, mask, log_pi)
-
         # ロールアウトの終端に達したら，最終状態をバッファに追加する．
         if step % self.rollout_length == 0:
             self.buffer.append_last_state(next_state)
@@ -100,10 +96,8 @@ class PPO:
     def update_ppo(self, states, actions, rewards, dones, log_pis):
         with torch.no_grad():
             values = self.critic(states)
-
         # GAEを計算する．
         targets, advantages = calculate_advantage(values, rewards, dones, self.gamma, self.lambd)
-
         # PPOを更新する．
         for _ in range(self.epoch_ppo):
             indices = np.arange(self.rollout_length)

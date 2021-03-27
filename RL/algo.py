@@ -197,10 +197,8 @@ def calc_log_pi(log_stds, noises, actions):
     # ガウス分布 `N(0, stds * I)` における `noises * stds` の確率密度の対数(= \log \pi(u|a))を計算する．
     stds = log_stds.exp()
     gaussian_log_probs = torch.distributions.Normal(torch.zeros_like(stds), stds).log_prob(stds * noises).sum(dim=-1, keepdim=True)
-
     # tanh による確率密度の変化を修正する．
     log_pis = gaussian_log_probs - torch.log(1.0 - actions.pow(2) + 1e-6).sum(dim=-1, keepdim=True)
-
     return log_pis
 
 
