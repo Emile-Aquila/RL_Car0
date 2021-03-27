@@ -19,7 +19,6 @@ class MyEnv:
         self._state_frame_len = 1  # stateに変換する時のframeの数
         self._step_repeat_times = 3  # 同じ行動を繰り返す回数
         self.observation_space = (80, 160, 3*self._state_frame_len)
-        print("obs shape {}".format(self.observation_space))
         self.state_shape = 32*self._state_frame_len
 
         # vae

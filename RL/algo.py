@@ -116,6 +116,7 @@ class Trainer:
         self.eval_interval = eval_interval  # 評価の間のステップ数(インターバル)．
         self.num_eval_episodes = num_eval_episodes  # 評価を行うエピソード数．
         self.eval_id = 0  # 現在のevalの番号
+        self.max_score = None
 
     def train(self):  # num_stepsステップの間，データ収集・学習・評価を繰り返す．
         self.start_time = time()  # 学習開始の時間
@@ -141,12 +142,15 @@ class Trainer:
             if steps % self.eval_interval == 0:  # 一定のインターバルで評価する．
                 rew_ave = self.evaluate(steps)
                 writer.add_scalar("evaluate rew", rew_ave, steps)
-                torch.save(self.algo.actor.cpu().state_dict(), './models/actor.pth')
-                self.algo.actor.to(dev)
-                torch.save(self.algo.critic.cpu().state_dict(), './models/critic.pth')
-                self.algo.critic.to(dev)
-                torch.save(self.algo.critic_target.cpu().state_dict(), './models/c_target.pth')
-                self.algo.critic_target.to(dev)
+                if self.max_score is None or rew_ave > self.max_score:
+                    self.max_score = rew_ave
+                    torch.save(self.algo.actor.cpu().state_dict(), './models/actor.pth')
+                    self.algo.actor.to(dev)
+                    torch.save(self.algo.critic.cpu().state_dict(), './models/critic.pth')
+                    self.algo.critic.to(dev)
+                    torch.save(self.algo.critic_target.cpu().state_dict(), './models/c_target.pth')
+                    self.algo.critic_target.to(dev)
+                    print("step:{}, model saved.".format(steps))
                 state = self.env.reset()
         writer.close()
 
