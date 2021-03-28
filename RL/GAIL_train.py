@@ -19,27 +19,29 @@ env_online = env
 STD = 0.0
 # デモンストレーション時にランダムに行動する確率．
 P_RAND = 0.05
-BUFFER_SIZE = 10 ** 6
+BUFFER_SIZE = 10 ** 5
 SEED = 0
 
 # 学習済みの重みのパス．
-WEIGHT_OPTIMAL = os.path.join("./models/actor.pth")
+WEIGHT_OPTIMAL = os.path.join("./model_for_gail/actor.pth")
 # バッファを保存するパス．
 BUFFER_OPTIMAL = os.path.join("./" + f'buffer_optimal_std{STD}_p_rand{P_RAND}.pth')
 
-sac_agent = SAC(
-    state_shape=env.state_shape,
-    # state_shape=32,
-    action_shape=env.action_space.shape,
-    seed=SEED,
-    reward_scale=1.0,
-    # start_steps=5 * 10,
-    start_steps=0,
-    batch_size=0,
-    buffer_size=1,
-)
+# sac_agent = SAC(
+#     state_shape=env.state_shape,
+#     # state_shape=32,
+#     action_shape=env.action_space.shape,
+#     seed=SEED,
+#     reward_scale=1.0,
+#     # start_steps=5 * 10,
+#     start_steps=0,
+#     batch_size=0,
+#     buffer_size=1,
+# )
+agent = ActorNetwork(state_shape=env.state_shape, action_shape=env.action_space.shape)
 
-buffer = collect_data(sac_agent, env, WEIGHT_OPTIMAL, BUFFER_SIZE, STD, P_RAND)
+
+buffer = collect_data(agent, env, WEIGHT_OPTIMAL, BUFFER_SIZE, STD, P_RAND)
 buffer.save(BUFFER_OPTIMAL)
 
 # PPOの学習バッチサイズ．
@@ -57,7 +59,7 @@ EVAL_INTERVAL = 2500
 
 algo = GAIL(
     buffer_exp=SerializedBuffer(BUFFER_OPTIMAL),
-    state_shape=env.observation_space.shape,
+    state_shape=env.state_shape,
     action_shape=env.action_space.shape,
     seed=SEED,
     batch_size=BATCH_SIZE,

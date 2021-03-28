@@ -74,10 +74,11 @@ class PPO:
 
         action, log_pi = self.explore(state)
         next_state, reward, done, _ = env.step(action)
+        # print("step done {}".format(done))
         # ゲームオーバーではなく，最大ステップ数に到達したことでエピソードが終了した場合は，
         # 本来であればその先もMDPが継続するはず．よって，終了シグナルをFalseにする．
-        mask = False if t == env._max_episode_steps else done
-        self.buffer.append(state, action, reward, mask, log_pi)
+        # mask = False if t == env._max_episode_steps else done
+        self.buffer.append(state, action, reward, done, log_pi)
         # ロールアウトの終端に達したら，最終状態をバッファに追加する．
         if step % self.rollout_length == 0:
             self.buffer.append_last_state(next_state)

@@ -35,12 +35,11 @@ class Trainer:
     def evaluate(self, step):
         """ 複数エピソード環境を動かし，平均収益を記録する． """
         total_return = 0.0
-
         for _ in range(self.num_eval_episodes):
             state = self.env.reset()
             done = False
 
-            while (not done):
+            while not done:
                 action = self.algo.select_action(state)
                 state, reward, done, _ = self.env.step(action)
                 total_return += reward
