@@ -2,6 +2,7 @@
 /RL/mp4/*
 /RL/logs/*
 /RL/models/*
+/RL/models_GAIL/*
 /RL/0_except/*
 /RL/__pycache__/*
 /RL/unitylog.txt

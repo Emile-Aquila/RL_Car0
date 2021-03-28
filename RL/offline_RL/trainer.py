@@ -5,6 +5,8 @@ import gym
 import matplotlib.pyplot as plt
 from datetime import timedelta
 from time import time
+from torch.utils.tensorboard import SummaryWriter
+dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 
 class Trainer:
@@ -51,6 +53,7 @@ class Trainer:
         print(f'Num steps: {step:<6}   '
               f'Return: {mean_return:<5.1f}   '
               f'Time: {self.time}')
+        return mean_return
 
     # def visualize(self):
     #     """ 1エピソード環境を動かし，mp4を再生する． """
@@ -93,19 +96,31 @@ class GAILTrainer(Trainer):
     def train(self):
         # 学習開始の時間
         self.start_time = time()
+        writer = SummaryWriter(log_dir="./logs")
         # エピソードのステップ数．
         t = 0
         # 環境を初期化する．
         state = self.env_online.reset()
-
+        eval_time = 0
+        max_mean = None
         for step in range(1, self.num_steps + 1):
             # 環境を1ステップ進める．
             state, t = self.algo.step(self.env_online, state, t, step)
 
             # 一定のインターバルで学習する．
             if self.algo.is_update(step):
-                self.algo.update()
+                l_c, l_a = self.algo.update()
+                writer.add_scalar("actor loss", l_a, t)
+                writer.add_scalar("critic loss", l_c, t)
 
             # 一定のインターバルで評価する．
             if step % self.eval_interval == 0:
-                self.evaluate(step)
+                mean_return = self.evaluate(step)
+                writer.add_scalar("average rew", mean_return, eval_time)
+                eval_time += 1
+                if max_mean is None or mean_return > max_mean:
+                    max_mean = mean_return
+                    torch.save(self.algo.actor.cpu().state_dict(), './models_GAIL/actor.pth')
+                    self.algo.actor.to(dev)
+                    torch.save(self.algo.critic.cpu().state_dict(), './models_GAIL/critic.pth')
+                    self.algo.critic.to(dev)

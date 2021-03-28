@@ -92,7 +92,8 @@ class PPO:
 
     def update(self):
         states, actions, rewards, dones, log_pis = self.buffer.get()
-        self.update_ppo(states, actions, rewards, dones, log_pis)
+        loss_critic, loss_actor = self.update_ppo(states, actions, rewards, dones, log_pis)
+        return loss_critic, loss_actor
 
     def update_ppo(self, states, actions, rewards, dones, log_pis):
         with torch.no_grad():
@@ -100,14 +101,18 @@ class PPO:
         # GAEを計算する．
         targets, advantages = calculate_advantage(values, rewards, dones, self.gamma, self.lambd)
         # PPOを更新する．
+        loss_actors, loss_critics = [], []
         for _ in range(self.epoch_ppo):
             indices = np.arange(self.rollout_length)
             np.random.shuffle(indices)
 
             for start in range(0, self.rollout_length, self.batch_size):
                 idxes = indices[start:start + self.batch_size]
-                self.update_critic(states[idxes], targets[idxes])
-                self.update_actor(states[idxes], actions[idxes], log_pis[idxes], advantages[idxes])
+                loss_critic = self.update_critic(states[idxes], targets[idxes])
+                loss_actor = self.update_actor(states[idxes], actions[idxes], log_pis[idxes], advantages[idxes])
+                loss_critics.append(loss_critic)
+                loss_actors.append(loss_actor)
+        return np.mean(loss_critics), np.mean(loss_actors)
 
     def update_critic(self, states, targets):
         loss_critic = (self.critic(states) - targets).pow_(2).mean()
@@ -116,6 +121,7 @@ class PPO:
         loss_critic.backward(retain_graph=False)
         nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
         self.optim_critic.step()
+        return loss_critic.clone().cpu().detach().numpy()
 
     def update_actor(self, states, actions, log_pis_old, advantages):
         log_pis = self.actor.evaluate_log_pi(states, actions)
@@ -134,3 +140,4 @@ class PPO:
         loss_actor.backward(retain_graph=False)
         nn.utils.clip_grad_norm_(self.actor.parameters(), self.max_grad_norm)
         self.optim_actor.step()
+        return loss_actor.clone().cpu().detach().numpy()

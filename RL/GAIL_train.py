@@ -20,6 +20,7 @@ STD = 0.0
 # デモンストレーション時にランダムに行動する確率．
 P_RAND = 0.05
 BUFFER_SIZE = 10 ** 5
+# BUFFER_SIZE = 10 ** 2
 SEED = 0
 
 # 学習済みの重みのパス．
@@ -46,15 +47,16 @@ buffer.save(BUFFER_OPTIMAL)
 
 # PPOの学習バッチサイズ．
 BATCH_SIZE = 1000
+# BATCH_SIZE = 1000
 # ロールアウトの長さ．
-ROLLOUT_LENGTH = 1000
+ROLLOUT_LENGTH = 300
 # ロールアウト毎のPPOの学習エポック数．
 EPOCH_DISC = 10
 # ロールアウト毎のDiscriminatorの学習エポック数．
 EPOCH_PPO = 200
 
 NUM_STEPS = 50000
-EVAL_INTERVAL = 2500
+EVAL_INTERVAL = 500
 
 
 algo = GAIL(
