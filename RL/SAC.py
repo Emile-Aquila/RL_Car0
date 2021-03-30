@@ -65,6 +65,10 @@ class SAC(Algorithm):
         self.total_rew = 0.0
         self.epsilon = epsilon
 
+    def update_epsilon(self, steps):
+        step = steps / 1000
+        self.epsilon = 0.05 / (1 + step)
+
     def is_update(self, steps):
         return steps >= max(self.start_steps, self.batch_size)
 
@@ -82,6 +86,7 @@ class SAC(Algorithm):
             t = 0
             n_state = env.reset()
             self.total_rew = 0.0
+        self.update_epsilon(steps)
         return n_state, t
 
     def actor_loss_func(self, states):

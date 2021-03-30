@@ -122,8 +122,8 @@ class Trainer:
         self.start_time = time()  # 学習開始の時間
         writer = SummaryWriter(log_dir="./logs")
         dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        writer.add_graph(self.algo.actor, torch.from_numpy(np.zeros(shape=(1, 32*1))).float().to(dev))
-        writer.add_graph(self.algo.critic, (torch.from_numpy(np.zeros(shape=(1, 32*1))).float().to(dev),
+        writer.add_graph(self.algo.actor, torch.from_numpy(np.zeros(shape=(1, 32*3))).float().to(dev))
+        writer.add_graph(self.algo.critic, (torch.from_numpy(np.zeros(shape=(1, 32*3))).float().to(dev),
                          torch.from_numpy(np.zeros(shape=(1, 2))).float().to(dev)))
 
         t = 0  # エピソードのステップ数．
@@ -139,6 +139,7 @@ class Trainer:
                 writer.add_scalar("critic loss2", l_c2, steps)
                 writer.add_scalar("log pi", log_ps[0], steps)
                 writer.add_scalar("alpha", self.algo.alpha.clone().detach().numpy(), steps)
+                writer.add_scalar("epsilon", self.algo.epsilon, steps)
             if steps % self.eval_interval == 0:  # 一定のインターバルで評価する．
                 rew_ave = self.evaluate(steps)
                 writer.add_scalar("evaluate rew", rew_ave, steps)
