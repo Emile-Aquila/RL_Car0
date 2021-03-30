@@ -21,6 +21,8 @@ EVAL_INTERVAL = 500
 BATCH_SIZE = 64
 # BUFFER_SIZE = 10 ** 6
 BUFFER_SIZE = 5 * 10 ** 4
+DECAY = False  # epsilonのdecayをするか否かの切り替え.
+EPSILON = 0.00  # ランダム探索を行う確率.
 
 print("state shape {}".format(*env.observation_space))
 print("action shape {}".format(env.action_space.shape))
@@ -35,6 +37,8 @@ algo = SAC(
     start_steps=START_STEP,
     batch_size=BATCH_SIZE,
     buffer_size=BUFFER_SIZE,
+    epsilon=EPSILON,
+    decay=DECAY,
 )
 
 trainer = Trainer(
