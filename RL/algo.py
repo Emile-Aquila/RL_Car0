@@ -42,32 +42,6 @@ class Algorithm(ABC):
         pass
 
 
-# class ReplayBuffer:
-#     def __init__(self, buffer_size):
-#         self.buf = replay_buffers.ReplayBuffer(capacity=buffer_size)
-#         self.dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-#
-#     def append(self, state, action, reward, done, next_state):
-#         state_ = torch.from_numpy(state)
-#         act_ = torch.from_numpy(action)
-#         n_state_ = torch.from_numpy(next_state)
-#         self.buf.append(state_, act_, torch.Tensor([reward]), n_state_, is_state_terminal=done)
-#
-#     def sample(self, batch_size):
-#         states, acts, rews, dones, n_states = [], [], [], [], []
-#         for obs in self.buf.sample(batch_size):
-#             states.append(obs[0]["state"])
-#             acts.append(obs[0]["action"])
-#             rews.append(obs[0]["reward"])
-#             dones.append(torch.Tensor([float(obs[0]["is_state_terminal"])]))
-#             n_states.append(obs[0]["next_state"])
-#         states = torch.cat(states).reshape(len(states), *states[0].shape).to(self.dev)
-#         n_states = torch.cat(n_states).reshape(len(n_states), *n_states[0].shape).to(self.dev)
-#         acts = torch.cat(acts).reshape(len(acts), *acts[0].shape).to(self.dev)
-#         rews = torch.cat(rews).reshape(len(rews), *rews[0].shape).to(self.dev)
-#         dones = torch.cat(dones).reshape(len(dones), *dones[0].shape).to(self.dev)
-#         ans = (states, acts, rews, dones, n_states)
-#         return ans
 class ReplayBuffer:
     def __init__(self, buffer_size, state_shape, action_shape):
         self._idx = 0  # 次にデータを挿入するインデックス．

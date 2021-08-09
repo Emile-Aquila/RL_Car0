@@ -1,7 +1,5 @@
 import torch
 from algo import Trainer
-# import pybullet_envs
-# import pybullet
 import gym_donkeycar
 import gym
 from SAC import SAC

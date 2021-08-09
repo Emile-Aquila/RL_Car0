@@ -35,6 +35,8 @@ class SAC(Algorithm):
             state_shape=state_shape,
             action_shape=action_shape,
         )
+
+        # actor : policy, critic : Q-function
         self.actor = ActorNetwork(state_shape, action_shape).to(self.dev)
         self.critic = CriticNetwork(state_shape, action_shape).to(self.dev)
 
