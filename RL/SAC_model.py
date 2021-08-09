@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from algo import reparameterize
-import gym_donkeycar
 from env import MyEnv
 import gym
 
@@ -21,7 +20,6 @@ class ActorNetwork(nn.Module):
         super().__init__()
         num = 256
         self.net = nn.Sequential(
-            # nn.Linear(state_shape[0], num),
             nn.Linear(state_shape, num),
             nn.ReLU(inplace=True),
             nn.Linear(num, num),

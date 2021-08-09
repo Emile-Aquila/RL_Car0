@@ -7,7 +7,6 @@ import cv2
 import os
 import shutil
 from collections import deque
-from change_pict import detectColor
 import random
 
 

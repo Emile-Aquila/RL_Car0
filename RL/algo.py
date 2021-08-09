@@ -7,20 +7,22 @@ from time import time
 from datetime import timedelta
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-from pfrl import replay_buffers
 
 
 class Algorithm(ABC):
+    def __init__(self):
+        self.dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
     def explore(self, state):  # 確率論的な行動と，その行動の確率密度の対数 \log(\pi(a|s)) を返す.
-        dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        state = torch.tensor(state, dtype=torch.float, device=dev).unsqueeze_(0)
+        # dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        state = torch.tensor(state, dtype=torch.float, device=self.dev).unsqueeze_(0)
         with torch.no_grad():
             action, log_pi = self.actor.sample(state, False)
         return action.cpu().numpy()[0], log_pi.item()
 
     def exploit(self, state):  # 決定論的な行動を返す
-        dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        state = torch.tensor(state, dtype=torch.float, device=dev).unsqueeze_(0)
+        # dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        state = torch.tensor(state, dtype=torch.float, device=self.dev).unsqueeze_(0)
         with torch.no_grad():
             action = self.actor.sample(state, True)
         return action.cpu().numpy()[0]
@@ -31,14 +33,10 @@ class Algorithm(ABC):
 
     @abstractmethod
     def step(self, env, state, t, steps):
-        """ 環境(env)，現在の状態(state)，現在のエピソードのステップ数(t)，今までのトータルのステップ数(steps)を
-            受け取り，リプレイバッファへの保存などの処理を行い，状態・エピソードのステップ数を更新する．
-        """
         pass
 
     @abstractmethod
     def update(self):
-        """ 1回分の学習を行う． """
         pass
 
 
@@ -56,7 +54,6 @@ class ReplayBuffer:
         self.next_states = torch.empty((buffer_size, state_shape), dtype=torch.float, device=self.dev)
 
     def append(self, state, action, reward, done, next_state):
-        stat = torch.from_numpy(state)
         self.states[self._idx].copy_(torch.from_numpy(state))
         self.actions[self._idx].copy_(torch.from_numpy(action))
         self.rewards[self._idx] = float(reward)
@@ -118,6 +115,7 @@ class Trainer:
                 rew_ave = self.evaluate(steps)
                 writer.add_scalar("evaluate rew", rew_ave, steps)
                 if self.max_score is None or rew_ave > self.max_score:
+                    # 1episode内での平均報酬がmaxになった時にmodelを保存
                     self.max_score = rew_ave
                     torch.save(self.algo.actor.cpu().state_dict(), './models/actor.pth')
                     self.algo.actor.to(dev)
@@ -136,7 +134,6 @@ class Trainer:
             episode_return = 0.0
             for i in range(600):
                 action = self.algo.exploit(state)
-                # print(" eval action {}".format(action))
                 state, reward, done, _ = self.env_test.step(action, True)
                 episode_return += reward
                 if done:
@@ -156,8 +153,8 @@ class Trainer:
         return mean_return
 
     def plot(self):
-        """ 平均収益のグラフを描画する． """
-        fig = plt.figure(figsize=(8, 6))
+        # 平均収益のグラフを描画
+        # fig = plt.figure(figsize=(8, 6))
         plt.plot(self.returns['step'], self.returns['return'])
         plt.xlabel('Steps', fontsize=24)
         plt.ylabel('Return', fontsize=24)
@@ -167,12 +164,11 @@ class Trainer:
 
     @property
     def time(self):
-        """ 学習開始からの経過時間． """
+        # 学習開始からの経過時間
         return str(timedelta(seconds=int(time() - self.start_time)))
 
 
 def calc_log_pi(log_stds, noises, actions):
-    """ 確率論的な行動の確率密度を返す． """
     # ガウス分布 `N(0, stds * I)` における `noises * stds` の確率密度の対数(= \log \pi(u|a))を計算する．
     stds = log_stds.exp()
     gaussian_log_probs = torch.distributions.Normal(torch.zeros_like(stds), stds).log_prob(stds * noises).sum(dim=-1, keepdim=True)
@@ -184,16 +180,12 @@ def calc_log_pi(log_stds, noises, actions):
 
 
 def reparameterize(means, log_stds):
-    """ Reparameterization Trickを用いて，確率論的な行動とその確率密度を返す． """
-    # 標準偏差．
     stds = log_stds.exp()
-    # 標準ガウス分布から，ノイズをサンプリングする．
     noises = torch.randn_like(means)
     # Reparameterization Trickを用いて，N(means, stds)からのサンプルを計算する．
     us = means + noises * stds
     # tanh　を適用し，確率論的な行動を計算する．
     actions = torch.tanh(us)
-
     # 確率論的な行動の確率密度の対数を計算する．
     log_pis = calc_log_pi(log_stds, noises, actions)
 

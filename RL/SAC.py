@@ -5,14 +5,11 @@ from algo import Algorithm, ReplayBuffer
 from PIL import Image
 import gym_donkeycar
 import gym
-import random
 
 
 def show_state(state_np):
     state_np_ = state_np[50:130, 0:160, :]
-    # state_np_ = state_np
     img = Image.fromarray(state_np_, "RGB").convert("L")
-    # img = Image.fromarray(state_np_, "RGB").convert("L").point(lambda x: 0 if x < 190 else x)
     print(img)
     frame = np.array(img, dtype=np.float32)
     print(frame.shape)
@@ -22,10 +19,10 @@ def show_state(state_np):
 class SAC(Algorithm):
     def __init__(self, state_shape, action_shape, seed=0, batch_size=256, gamma=0.99, lr_actor=3e-4,
                  lr_critic=3e-4, lr_alpha=3e-4, buffer_size=5 * 10 ** 3, start_steps=5 * 10 ** 3, tau=5e-3,
-                 min_alpha=0.3, reward_scale=1.0, epsilon=0.00, decay=False):
+                 min_alpha=0.3, reward_scale=1.0, decay=False):
         super().__init__()
 
-        self.dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        # self.dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         np.random.seed(seed)
         torch.manual_seed(seed)
         torch.cuda.manual_seed(seed)
@@ -65,20 +62,14 @@ class SAC(Algorithm):
         self.batch_size = batch_size
         self.learning_steps = 0
         self.total_rew = 0.0
-        self.epsilon = epsilon
         self.decay = decay
-
-    def update_epsilon(self, steps):  # epsilonを減衰させる.
-        if self.decay:
-            step = steps / 1000
-            self.epsilon = 0.05 / (1 + step)
 
     def is_update(self, steps):
         return steps >= max(self.start_steps, self.batch_size)
 
     def step(self, env, state, t, steps):
         t += 1
-        if steps <= self.start_steps or (self.epsilon >= random.random()):  # 最初はランダム.
+        if steps <= self.start_steps:  # 最初はランダム.
             action = env.action_space.sample()
             action[1] = action[1] * 2.0 - 1.0
         else:
@@ -90,7 +81,6 @@ class SAC(Algorithm):
             t = 0
             n_state = env.reset()
             self.total_rew = 0.0
-        self.update_epsilon(steps)
         return n_state, t
 
     def actor_loss_func(self, states):
@@ -100,22 +90,23 @@ class SAC(Algorithm):
         return loss_actor, log_pis
 
     def critic_loss_func(self, states, actions, rews, dones, n_states):
+        # (r(s,a) + \gamma V(s') - Q(s,a))^2 = (r(s,a) + \gamma {min[Q(s',a')] - \alpha \log \pi (a|s)} - Q(s,a))^2
         now_q1, now_q2 = self.critic(states, actions)
-        with torch.no_grad():
+        with torch.no_grad():  # 勾配を流さない事に注意
             n_actions, log_pis = self.actor.sample(n_states, False)
             q1, q2 = self.critic_target(n_states, n_actions)
             target_vs = torch.min(q1, q2) - self.alpha * log_pis
+            # target_vs := V(s') = min(Q_1, Q_2) - alpha * log(\pi)
 
         target_qs = self.reward_scale * rews + self.gamma * target_vs * (1.0 - dones)  # r(s,a) + \gamma V(s')
-        # loss funcs
+        # double network, loss := mean{(Q - target_Q)^2}
         loss_c1 = (now_q1 - target_qs).pow_(2).mean()
         loss_c2 = (now_q2 - target_qs).pow_(2).mean()
         return loss_c1, loss_c2
 
     def update_critic(self, states, actions, rews, dones, n_states):
-        # (r(s,a) + \gamma V(s') - Q(s,a))^2 = (r(s,a) + \gamma {min[Q(s',a')] - \alpha \log \pi (a|s)} - Q(s,a))^2
         loss_c1, loss_c2 = self.critic_loss_func(states, actions, rews, dones, n_states)
-        # update
+
         self.optim_critic.zero_grad()
         (loss_c1 + loss_c2).backward(retain_graph=False)
         torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 1.0)
@@ -124,7 +115,7 @@ class SAC(Algorithm):
 
     def update_actor(self, states):
         loss_actor, log_pis = self.actor_loss_func(states)
-        # update
+
         self.optim_actor.zero_grad()
         loss_actor.backward(retain_graph=False)
         torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 1.0)
@@ -133,6 +124,7 @@ class SAC(Algorithm):
         return loss_actor.clone().detach(), log_pis.clone().detach()
 
     def update_target(self):
+        # update target network
         for target, trained in zip(self.critic_target.parameters(), self.critic.parameters()):
             target.data.mul_(1.0 - self.tau)
             target.data.add_(self.tau * trained.data)
