@@ -12,16 +12,15 @@ from tqdm import tqdm
 class Algorithm(ABC):
     def __init__(self):
         self.dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        print("device : {}".format(self.dev))
 
     def explore(self, state):  # 確率論的な行動と，その行動の確率密度の対数 \log(\pi(a|s)) を返す.
-        # dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         state = torch.tensor(state, dtype=torch.float, device=self.dev).unsqueeze_(0)
         with torch.no_grad():
             action, log_pi = self.actor.sample(state, False)
         return action.cpu().numpy()[0], log_pi.item()
 
     def exploit(self, state):  # 決定論的な行動を返す
-        # dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         state = torch.tensor(state, dtype=torch.float, device=self.dev).unsqueeze_(0)
         with torch.no_grad():
             action = self.actor.sample(state, True)
@@ -110,7 +109,6 @@ class Trainer:
                 writer.add_scalar("critic loss2", l_c2, steps)
                 writer.add_scalar("log pi", log_ps[0], steps)
                 writer.add_scalar("alpha", self.algo.alpha.clone().detach().numpy(), steps)
-                writer.add_scalar("epsilon", self.algo.epsilon, steps)
             if steps % self.eval_interval == 0:  # 一定のインターバルで評価する．
                 rew_ave = self.evaluate(steps)
                 writer.add_scalar("evaluate rew", rew_ave, steps)

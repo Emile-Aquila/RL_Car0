@@ -19,10 +19,9 @@ def show_state(state_np):
 class SAC(Algorithm):
     def __init__(self, state_shape, action_shape, seed=0, batch_size=256, gamma=0.99, lr_actor=3e-4,
                  lr_critic=3e-4, lr_alpha=3e-4, buffer_size=5 * 10 ** 3, start_steps=5 * 10 ** 3, tau=5e-3,
-                 min_alpha=0.3, reward_scale=1.0, decay=False):
+                 target_alpha=-1.0, reward_scale=1.0):
         super().__init__()
 
-        # self.dev = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         np.random.seed(seed)
         torch.manual_seed(seed)
         torch.cuda.manual_seed(seed)
@@ -41,7 +40,7 @@ class SAC(Algorithm):
         self.critic_target = CriticNetwork(state_shape, action_shape).to(self.dev).eval()
 
         # adjust entropy(\alpha)
-        self.min_alpha = torch.tensor(min_alpha)
+        self.target_alpha = torch.tensor(target_alpha)
         self.alpha = torch.tensor(1.0, requires_grad=True)
 
         # init target network
@@ -62,12 +61,16 @@ class SAC(Algorithm):
         self.batch_size = batch_size
         self.learning_steps = 0
         self.total_rew = 0.0
-        self.decay = decay
 
     def is_update(self, steps):
         return steps >= max(self.start_steps, self.batch_size)
 
-    def step(self, env, state, t, steps):
+    def step(self, env, state, t, steps, force_end=False):
+        if force_end:
+            t = 0
+            n_state = env.reset()
+            self.total_rew = 0.0
+            return n_state, t
         t += 1
         if steps <= self.start_steps:  # 最初はランダム.
             action = env.action_space.sample()
@@ -108,7 +111,7 @@ class SAC(Algorithm):
         loss_c1, loss_c2 = self.critic_loss_func(states, actions, rews, dones, n_states)
 
         self.optim_critic.zero_grad()
-        (loss_c1 + loss_c2).backward(retain_graph=False)
+        (loss_c1 + loss_c2).backward()
         torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 1.0)
         self.optim_critic.step()
         return loss_c1.clone().detach(), loss_c2.clone().detach()
@@ -117,7 +120,7 @@ class SAC(Algorithm):
         loss_actor, log_pis = self.actor_loss_func(states)
 
         self.optim_actor.zero_grad()
-        loss_actor.backward(retain_graph=False)
+        loss_actor.backward()
         torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 1.0)
         self.optim_actor.step()
         self.entropy_adjust_func(log_pis)
@@ -139,7 +142,7 @@ class SAC(Algorithm):
 
     def entropy_adjust_func(self, log_pis):
         with torch.no_grad():
-            loss = log_pis + self.min_alpha
+            loss = log_pis + self.target_alpha
         loss = -(self.alpha * loss).mean()
         self.optim_alpha.zero_grad()
         loss.backward()
